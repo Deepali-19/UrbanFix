@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_margin="10dp"
+    android:padding="10dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="5dp">
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <!-- Profile -->
+        <de.hdodenhof.circleimageview.CircleImageView
+            android:id="@+id/imgProfile"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:src="@drawable/users"/>
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_marginStart="10dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Name"
+                android:textStyle="bold"
+                android:textSize="16sp"/>
+
+            <TextView
+                android:id="@+id/tvDepartment"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Department"/>
+
+            <TextView
+                android:id="@+id/tvPhone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Phone"/>
+
+            <TextView
+                android:id="@+id/tvCount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="In Progress: 0"
+                android:textStyle="bold"
+                android:textColor="#5B8CFF"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>
