@@ -37,7 +37,7 @@ class ComplaintAdapter(
             complaint.firebaseKey.ifBlank { "No ID" }
         }
         val locationText = complaint.location.ifBlank { "Location not available" }
-        val issueTypeText = complaint.issueType.ifBlank { "General" }
+        val departmentText = ComplaintDataFormatter.resolvedDepartment(complaint)
         val dateText = if (complaint.timestamp > 0L) {
             SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
                 .format(Date(complaint.timestamp))
@@ -55,11 +55,11 @@ class ComplaintAdapter(
 
         holder.binding.tvTitle.text = complaint.title.ifBlank { "Untitled complaint" }
         holder.binding.tvLocation.text = locationText
-        holder.binding.tvDepartment.text = issueTypeText
+        holder.binding.tvDepartment.text = departmentText
 
         holder.binding.tvAssigned.text =
             if (complaint.allottedOfficerId.isEmpty())
-                "Not assigned"
+                "Not assigned yet"
             else
                 "Assigned to field officer"
         holder.binding.tvDateTime.text = dateText

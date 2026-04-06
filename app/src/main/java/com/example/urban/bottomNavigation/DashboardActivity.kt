@@ -172,12 +172,7 @@ class DashboardActivity : AppCompatActivity() {
 //}
 override fun onCreateOptionsMenu(menu: Menu): Boolean {
 
-    menu.clear() // IMPORTANT (prevents old menu bug)
-
-    if (currentFragment is ProfileFragment) {
-        menuInflater.inflate(R.menu.profile_menu, menu)
-    }
-
+    menu.clear()
     return true
 }
     // ================= ROLE =================
@@ -312,21 +307,7 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-
-        return when (item.itemId) {
-
-            R.id.menu_settings -> {
-                android.widget.Toast.makeText(this, "Settings Clicked", android.widget.Toast.LENGTH_SHORT).show()
-                true
-            }
-
-            R.id.menu_help -> {
-                android.widget.Toast.makeText(this, "Help Clicked", android.widget.Toast.LENGTH_SHORT).show()
-                true
-            }
-
-            else -> super.onOptionsItemSelected(item)
-        }
+        return super.onOptionsItemSelected(item)
     }
 
 }

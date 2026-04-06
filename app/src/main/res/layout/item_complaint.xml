@@ -4,8 +4,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="10dp"
-    android:layout_marginTop="8dp"
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginTop="6dp"
     android:layout_marginBottom="2dp"
     app:cardBackgroundColor="#FFFFFF"
     app:cardCornerRadius="20dp"
@@ -55,6 +55,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="6dp"
                     android:background="@drawable/priority_low"
+                    android:gravity="center"
                     android:paddingStart="10dp"
                     android:paddingTop="5dp"
                     android:paddingEnd="10dp"
@@ -69,6 +70,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/status_pending"
+                    android:gravity="center"
                     android:paddingStart="10dp"
                     android:paddingTop="5dp"
                     android:paddingEnd="10dp"
@@ -101,11 +103,15 @@
 
             <TextView
                 android:id="@+id/tvDepartment"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:background="#EEF5FF"
+                android:paddingStart="10dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="5dp"
                 android:text="Water"
-                android:textColor="#4A5A75"
+                android:textColor="#2457A7"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
@@ -113,6 +119,7 @@
                 android:id="@+id/tvDateTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
                 android:text="05 Apr 2026"
                 android:textColor="#7A8599"
                 android:textSize="12sp" />

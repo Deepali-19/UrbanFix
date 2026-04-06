@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/tvHelpTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Profile Help"
+        android:textColor="#111827"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvHelpBody"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="Use this screen to manage your official account details."
+        android:textColor="#475467"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/tvHelpTipOne"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="#F8FAFC"
+        android:padding="12dp"
+        android:text="Tip 1"
+        android:textColor="#111827"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/tvHelpTipTwo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="#F8FAFC"
+        android:padding="12dp"
+        android:text="Tip 2"
+        android:textColor="#111827"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/tvHelpTipThree"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="#F8FAFC"
+        android:padding="12dp"
+        android:text="Tip 3"
+        android:textColor="#111827"
+        android:textSize="13sp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnCloseHelp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_marginTop="18dp"
+        android:text="Close"
+        android:textAllCaps="false" />
+
+</LinearLayout>
