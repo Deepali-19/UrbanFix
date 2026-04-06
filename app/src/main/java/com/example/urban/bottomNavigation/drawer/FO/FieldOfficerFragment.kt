@@ -71,7 +71,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
 
     private fun loadComplaintCount(officer: FieldOfficer) {
 
-        database.child("complaints")
+        database.child("Complaints")
             .orderByChild("allottedOfficerId")
             .equalTo(officer.uid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
@@ -89,7 +89,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
                         }
                     }
 
-                    officer.phone += "" // trigger update
+                    officer.inProgressCount = count
                     adapter.notifyDataSetChanged()
                 }
 
@@ -98,4 +98,3 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
     }
 
 }
-

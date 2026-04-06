@@ -12,6 +12,7 @@ import com.bumptech.glide.Glide
 import com.example.urban.R
 import com.example.urban.bottomNavigation.complaint.Complaint
 import com.example.urban.bottomNavigation.complaint.ComplaintAdapter
+import com.example.urban.bottomNavigation.complaint.ComplaintDetailFragment
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -43,7 +44,15 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
 
         officerId = arguments?.getString("officerId")
 
-        adapter = ComplaintAdapter(complaintList)
+        adapter = ComplaintAdapter(mutableListOf()) { complaint ->
+            val complaintKey = complaint.firebaseKey.ifBlank { complaint.complaintId }
+            if (complaintKey.isNotBlank()) {
+                parentFragmentManager.beginTransaction()
+                    .replace(R.id.fragmentContainer, ComplaintDetailFragment.newInstance(complaintKey))
+                    .addToBackStack(null)
+                    .commit()
+            }
+        }
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = adapter
 
@@ -60,11 +69,19 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
                 val name = it.child("name").value.toString()
                 val dept = it.child("department").value.toString()
                 val phone = it.child("phone").value.toString()
+                val employeeId = it.child("employeeId").value.toString()
+                val city = it.child("city").value.toString()
                 val image = it.child("profileImageUrl").value?.toString()
+                val metaText = when {
+                    phone.isNotBlank() -> "Phone: $phone"
+                    employeeId.isNotBlank() -> "Employee ID: $employeeId"
+                    city.isNotBlank() -> "City: $city"
+                    else -> "Details not available"
+                }
 
                 tvName.text = name
                 tvDept.text = "Department: $dept"
-                tvPhone.text = "Phone: $phone"
+                tvPhone.text = metaText
 
                 if (!image.isNullOrEmpty()) {
                     Glide.with(requireContext()).load(image).into(imgProfile)
@@ -74,7 +91,7 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
 
     private fun loadComplaints() {
 
-        database.child("complaints")
+        database.child("Complaints")
             .orderByChild("allottedOfficerId")
             .equalTo(officerId)
             .addListenerForSingleValueEvent(object : ValueEventListener {
@@ -87,11 +104,13 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
 
                         val complaint =
                             data.getValue(Complaint::class.java) ?: continue
+                        complaint.firebaseKey = data.key.orEmpty()
 
                         complaintList.add(complaint)
                     }
 
-                    adapter.notifyDataSetChanged()
+                    complaintList.sortByDescending { it.timestamp }
+                    adapter.updateList(complaintList)
                 }
 
                 override fun onCancelled(error: DatabaseError) {}

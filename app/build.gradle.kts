@@ -114,6 +114,9 @@ dependencies {
     //Shimmer Loading
     implementation("com.facebook.shimmer:shimmer:0.5.0")
 
+    //Lottie loading animation
+    implementation("com.airbnb.android:lottie:6.4.1")
+
     //CircleImage
     implementation("de.hdodenhof:circleimageview:3.1.0")
 

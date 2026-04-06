@@ -32,6 +32,7 @@ class DashboardActivity : AppCompatActivity() {
     private lateinit var toolbar: MaterialToolbar
 
     private var currentFragment: Fragment? = null
+    private var isFreshLaunch = false
 
     private val auth = FirebaseAuth.getInstance()
     private val database = FirebaseDatabase.getInstance().reference
@@ -39,6 +40,7 @@ class DashboardActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_dashboard)
+        isFreshLaunch = savedInstanceState == null
 
         // ================= INIT =================
         bottomNav = findViewById(R.id.bottomNav)
@@ -47,13 +49,6 @@ class DashboardActivity : AppCompatActivity() {
         toolbar = findViewById(R.id.topBar)
 
         setSupportActionBar(toolbar)
-
-        toolbar.setNavigationOnClickListener {
-            android.widget.Toast.makeText(this, "Clicked", android.widget.Toast.LENGTH_SHORT).show()
-        }
-
-        // ================= LOAD DEFAULT SCREEN =================
-        loadFragment(HomeFragment())
 
         // ================= BOTTOM NAVIGATION =================
         bottomNav.setOnItemSelectedListener {
@@ -135,10 +130,11 @@ class DashboardActivity : AppCompatActivity() {
         //  Title change
         when (fragment) {
             is HomeFragment -> toolbar.title = "Dashboard"
-            is ProfileFragment -> toolbar.title = " Your Profile"
+            is ProfileFragment -> toolbar.title = "Your Profile"
             is ComplaintFragment -> toolbar.title = "Complaints"
             is AlertsFragment -> toolbar.title = "Notifications"
             is MapFragment -> toolbar.title = "Map"
+            is FieldOfficerFragment -> toolbar.title = "Field Officers"
         }
 
         //  Refresh menu
@@ -203,10 +199,26 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
     private fun setupBottomNav(role: String) {
 
         val menu = bottomNav.menu
+        navDrawer.menu.findItem(R.id.nav_officers).isVisible = role != "Field Officer"
 
         if (role == "Field Officer") {
             menu.findItem(R.id.nav_home).isVisible = false
         }
+
+        if (isFreshLaunch) {
+            loadDefaultFragmentForRole(role)
+            isFreshLaunch = false
+        }
+    }
+
+    private fun loadDefaultFragmentForRole(role: String) {
+        val defaultItemId = if (role == "Field Officer") {
+            R.id.nav_complaints
+        } else {
+            R.id.nav_home
+        }
+
+        bottomNav.selectedItemId = defaultItemId
     }
 
     // ================= FCM =================

@@ -5,5 +5,8 @@ var uid: String = "",
 var name: String = "",
 var department: String = "",
 var phone: String = "",
-var profileImageUrl: String = ""
+var employeeId: String = "",
+var city: String = "",
+var profileImageUrl: String = "",
+var inProgressCount: Int = 0
 )

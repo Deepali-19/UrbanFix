@@ -34,10 +34,17 @@ class FieldOfficerAdapter (
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
 
             val officer = list[position]
+            val metaText = when {
+                officer.phone.isNotBlank() -> "Phone: ${officer.phone}"
+                officer.employeeId.isNotBlank() -> "Employee ID: ${officer.employeeId}"
+                officer.city.isNotBlank() -> "City: ${officer.city}"
+                else -> "Details not available"
+            }
 
             holder.name.text = officer.name
             holder.dept.text = "Dept: ${officer.department}"
-            holder.phone.text = "Phone: ${officer.phone}"
+            holder.phone.text = metaText
+            holder.count.text = "In Progress: ${officer.inProgressCount}"
 
             if (officer.profileImageUrl.isNotEmpty()) {
                 Glide.with(holder.itemView.context)

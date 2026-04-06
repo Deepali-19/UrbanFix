@@ -1,7 +1,6 @@
 package com.example.urban.bottomNavigation.complaint
 
-
-
+import com.google.firebase.database.Exclude
 
 data class Complaint(
     val complaintId: String = "",
@@ -20,5 +19,10 @@ data class Complaint(
     val timestamp: Long = 0L,
     val priority: Int = 0, // 0 = Low, 1 = Medium, 2 = High
     val validation: Boolean = false,
+    val readByAdmin: Boolean = false,
     val departmentId: String = "",
-)
+) {
+    @get:Exclude
+    @set:Exclude
+    var firebaseKey: String = ""
+}

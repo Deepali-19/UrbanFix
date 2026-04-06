@@ -10,6 +10,7 @@ import java.util.*
 
 class ComplaintAdapter(
     private var list: MutableList<Complaint> = mutableListOf(),
+    var showUnreadIndicator: Boolean = false,
     private val click: ((Complaint) -> Unit)? = null
 ) : RecyclerView.Adapter<ComplaintAdapter.ViewHolder>() {
 
@@ -32,30 +33,55 @@ class ComplaintAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
 
         val complaint = list[position]
+        val displayId = complaint.complaintId.ifBlank {
+            complaint.firebaseKey.ifBlank { "No ID" }
+        }
+        val locationText = complaint.location.ifBlank { "Location not available" }
+        val issueTypeText = complaint.issueType.ifBlank { "General" }
+        val dateText = if (complaint.timestamp > 0L) {
+            SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+                .format(Date(complaint.timestamp))
+        } else {
+            "No date"
+        }
 
-        // ✅ SAFE DATA (no crash)
-        holder.binding.tvComplaintId.text =
-            complaint.complaintId.ifEmpty { "No ID" }
+        holder.binding.tvComplaintId.text = displayId
+        holder.binding.viewUnreadDot.visibility =
+            if (showUnreadIndicator && !complaint.readByAdmin) {
+                android.view.View.VISIBLE
+            } else {
+                android.view.View.GONE
+            }
 
-        holder.binding.tvTitle.text = complaint.title
-        holder.binding.tvLocation.text = complaint.location
-        holder.binding.tvDepartment.text = complaint.issueType
+        holder.binding.tvTitle.text = complaint.title.ifBlank { "Untitled complaint" }
+        holder.binding.tvLocation.text = locationText
+        holder.binding.tvDepartment.text = issueTypeText
 
-        // ✅ DATE FORMAT
-        val date = Date(complaint.timestamp)
-        val format = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-        holder.binding.tvDateTime.text = format.format(date)
-
-        // ✅ ASSIGNED OFFICER
         holder.binding.tvAssigned.text =
             if (complaint.allottedOfficerId.isEmpty())
-                "Assigned: Not Assigned"
+                "Not assigned"
             else
-                "Assigned: Officer"
+                "Assigned to field officer"
+        holder.binding.tvDateTime.text = dateText
 
-        // ✅ STATUS UI
+        when (complaint.priority) {
+            2 -> {
+                holder.binding.tvPriority.text = "High"
+                holder.binding.tvPriority.setBackgroundResource(R.drawable.priority_high)
+            }
+
+            1 -> {
+                holder.binding.tvPriority.text = "Medium"
+                holder.binding.tvPriority.setBackgroundResource(R.drawable.priority_medium)
+            }
+
+            else -> {
+                holder.binding.tvPriority.text = "Low"
+                holder.binding.tvPriority.setBackgroundResource(R.drawable.priority_low)
+            }
+        }
+
         when (complaint.status) {
-
             0 -> {
                 holder.binding.tvStatus.text = "Pending"
                 holder.binding.tvStatus.setBackgroundResource(R.drawable.status_pending)
@@ -72,13 +98,11 @@ class ComplaintAdapter(
             }
         }
 
-        // ✅ CLICK SAFE
         holder.itemView.setOnClickListener {
             click?.invoke(complaint)
         }
     }
 
-    // 🔥 IMPORTANT: UPDATE LIST FUNCTION
     fun updateList(newList: List<Complaint>) {
         list.clear()
         list.addAll(newList)

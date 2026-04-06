@@ -33,6 +33,8 @@ import java.io.FileOutputStream
 class ProfileFragment : Fragment(R.layout.fragment_profile){
     private lateinit var profileImage: CircleImageView
     private lateinit var cameraIcon: ImageView
+    private lateinit var loadingContainer: View
+    private lateinit var contentScroll: View
 //    private lateinit var toolbar: Toolbar
 
     private lateinit var tvName: TextView
@@ -69,6 +71,8 @@ class ProfileFragment : Fragment(R.layout.fragment_profile){
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
 
+        loadingContainer = view.findViewById(R.id.profileLoadingContainer)
+        contentScroll = view.findViewById(R.id.profileContentScroll)
         profileImage = view.findViewById(R.id.profileImage)
         cameraIcon = view.findViewById(R.id.cameraIcon)
 //        toolbar = view.findViewById(R.id.profileToolbar)
@@ -159,11 +163,13 @@ class ProfileFragment : Fragment(R.layout.fragment_profile){
     private fun loadUserData() {
 
         val uid = auth.currentUser?.uid ?: return
+        showLoading(true)
 
         database.child("Users").child(uid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
 
                 override fun onDataChange(snapshot: DataSnapshot) {
+                    showLoading(false)
 
                     if (!snapshot.exists()) return
 
@@ -224,6 +230,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile){
                 }
 
                 override fun onCancelled(error: DatabaseError) {
+                    showLoading(false)
 
                     Toast.makeText(
                         requireContext(),
@@ -232,6 +239,11 @@ class ProfileFragment : Fragment(R.layout.fragment_profile){
                     ).show()
                 }
             })
+    }
+
+    private fun showLoading(isLoading: Boolean) {
+        loadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
+        contentScroll.visibility = if (isLoading) View.GONE else View.VISIBLE
     }
 //    private fun loadUserData() {
 //
