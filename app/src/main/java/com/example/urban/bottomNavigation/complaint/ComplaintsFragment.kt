@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ArrayAdapter
 import androidx.fragment.app.Fragment
+import androidx.core.os.bundleOf
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.urban.R
 import com.example.urban.databinding.FragmentComplaintsBinding
@@ -16,12 +17,35 @@ import com.google.firebase.database.ValueEventListener
 class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
     companion object {
+        const val REQUEST_KEY_FILTERS = "dashboardComplaintFilters"
+        private const val KEY_STATUS = "status"
+        private const val KEY_PRIORITY = "priority"
+        private const val KEY_DEPARTMENT = "department"
+        private const val KEY_SORT = "sort"
+        private const val KEY_RANGE = "range"
+
         private val APP_DEPARTMENTS = listOf(
             "Water",
             "Roads",
             "Sanitation",
             "Electricity"
         )
+
+        fun filterBundle(
+            status: String? = null,
+            priority: String? = null,
+            department: String? = null,
+            sort: String? = null,
+            range: String? = null
+        ): Bundle {
+            return bundleOf(
+                KEY_STATUS to status,
+                KEY_PRIORITY to priority,
+                KEY_DEPARTMENT to department,
+                KEY_SORT to sort,
+                KEY_RANGE to range
+            )
+        }
     }
 
     private lateinit var binding: FragmentComplaintsBinding
@@ -34,6 +58,27 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
     private var currentDepartment = ""
     private var currentUid = ""
     private var hasLoadedComplaints = false
+    private var pendingStatusFilter: String? = null
+    private var pendingPriorityFilter: String? = null
+    private var pendingDepartmentFilter: String? = null
+    private var pendingSortFilter: String? = null
+    private var pendingRangeFilter: String? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        parentFragmentManager.setFragmentResultListener(
+            REQUEST_KEY_FILTERS,
+            this
+        ) { _, bundle ->
+            pendingStatusFilter = bundle.getString(KEY_STATUS)
+            pendingPriorityFilter = bundle.getString(KEY_PRIORITY)
+            pendingDepartmentFilter = bundle.getString(KEY_DEPARTMENT)
+            pendingSortFilter = bundle.getString(KEY_SORT)
+            pendingRangeFilter = bundle.getString(KEY_RANGE)
+            applyPendingDashboardFilters()
+        }
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding = FragmentComplaintsBinding.bind(view)
@@ -57,6 +102,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         binding.rvComplaints.adapter = adapter
 
         setupStaticFilterDropdowns()
+        applyPendingDashboardFilters()
         setupFilterListeners()
         loadComplaints()
     }
@@ -147,6 +193,15 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
         setupDropdown(binding.actDepartmentFilter, options, "All Departments")
 
+        pendingDepartmentFilter?.let { requestedDepartment ->
+            val normalizedRequestedDepartment = normalizeDepartment(requestedDepartment)
+            if (normalizedRequestedDepartment in options) {
+                binding.actDepartmentFilter.setText(normalizedRequestedDepartment, false)
+                pendingDepartmentFilter = null
+                return
+            }
+        }
+
         if (selectedDepartment in options) {
             binding.actDepartmentFilter.setText(selectedDepartment, false)
         }
@@ -162,7 +217,8 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
             .filter { complaint ->
                 matchesStatus(complaint, selectedStatus) &&
                     matchesPriority(complaint, selectedPriority) &&
-                    matchesDepartment(complaint, selectedDepartment)
+                    matchesDepartment(complaint, selectedDepartment) &&
+                    matchesDashboardRange(complaint, pendingRangeFilter)
             }
             .sortedWith(sortComparator(selectedSort))
 
@@ -212,6 +268,60 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
             "sanitation", "sanitisation" -> "Sanitation"
             "electricity" -> "Electricity"
             else -> value.trim()
+        }
+    }
+
+    // Dashboard can pass a hidden time window so drill-down stays scoped.
+    private fun matchesDashboardRange(complaint: Complaint, requestedRange: String?): Boolean {
+        val timestamp = complaint.timestamp
+        if (requestedRange.isNullOrBlank() || timestamp <= 0L) {
+            return true
+        }
+
+        val now = java.time.LocalDate.now()
+        val complaintDate = java.time.Instant.ofEpochMilli(timestamp)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toLocalDate()
+
+        return when (requestedRange) {
+            "Today" -> complaintDate == now
+            "7 Days" -> !complaintDate.isBefore(now.minusDays(6))
+            "30 Days" -> !complaintDate.isBefore(now.minusDays(29))
+            "This Month" -> java.time.YearMonth.from(complaintDate) == java.time.YearMonth.now()
+            else -> true
+        }
+    }
+
+    private fun applyPendingDashboardFilters() {
+        if (!this::binding.isInitialized) return
+
+        pendingStatusFilter?.let {
+            binding.actStatusFilter.setText(it, false)
+            pendingStatusFilter = null
+        }
+
+        pendingPriorityFilter?.let {
+            binding.actPriorityFilter.setText(it, false)
+            pendingPriorityFilter = null
+        }
+
+        pendingDepartmentFilter?.let {
+            val normalizedDepartment = normalizeDepartment(it)
+            binding.actDepartmentFilter.setText(normalizedDepartment, false)
+            pendingDepartmentFilter = null
+        }
+
+        pendingSortFilter?.let {
+            binding.actSortFilter.setText(it, false)
+            pendingSortFilter = null
+        }
+
+        if (pendingRangeFilter.isNullOrBlank()) {
+            pendingRangeFilter = null
+        }
+
+        if (hasLoadedComplaints) {
+            applyFilters()
         }
     }
 

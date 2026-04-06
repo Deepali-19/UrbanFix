@@ -280,11 +280,15 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             R.id.rbResolved -> 2
             else -> 0
         }
+        val now = System.currentTimeMillis()
 
+        // Keep activity timestamps updated so the dashboard can show recent movement.
         val update = hashMapOf<String, Any>(
             "status" to status,
             "feedback" to remark,
-            "readByAdmin" to false
+            "readByAdmin" to false,
+            "updatedAt" to now,
+            "resolvedAt" to if (status == 2) now else 0L
         )
 
         database.child("Complaints")
@@ -308,6 +312,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         val key = complaintKey ?: return
         val complaint = currentComplaint ?: return
         val updates = hashMapOf<String, Any>()
+        val now = System.currentTimeMillis()
 
         val selectedPriority = priorityValueFromLabel(actPriority.text?.toString().orEmpty())
         if (selectedPriority != complaint.priority) {
@@ -337,6 +342,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
 
         updates["readByAdmin"] = true
+        updates["updatedAt"] = now
 
         database.child("Complaints")
             .child(key)

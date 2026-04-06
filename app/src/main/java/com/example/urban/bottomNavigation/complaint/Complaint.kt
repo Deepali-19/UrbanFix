@@ -17,6 +17,8 @@ data class Complaint(
     val feedback: String = "",
     val images: ArrayList<String> = arrayListOf(),
     val timestamp: Long = 0L,
+    val updatedAt: Long = 0L,
+    val resolvedAt: Long = 0L,
     val priority: Int = 0, // 0 = Low, 1 = Medium, 2 = High
     val validation: Boolean = false,
     val readByAdmin: Boolean = false,
