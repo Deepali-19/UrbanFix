@@ -24,6 +24,13 @@ class LoginActivity : AppCompatActivity() {
 
         auth = FirebaseAuth.getInstance()
 
+        if (intent.getBooleanExtra(SessionManager.EXTRA_SESSION_EXPIRED, false)) {
+            toast(
+                intent.getStringExtra(SessionManager.EXTRA_SESSION_MESSAGE)
+                    ?: "Session expired. Please login again."
+            )
+        }
+
         // Restore Remember Me
         val prefs = getSharedPreferences("login_prefs", MODE_PRIVATE)
         val savedEmail = prefs.getString("saved_email", "")
@@ -68,6 +75,7 @@ class LoginActivity : AppCompatActivity() {
 
         auth.signInWithEmailAndPassword(email, password)
             .addOnSuccessListener {
+                SessionManager.markAuthenticated(this)
                 startActivity(Intent(this, DashboardActivity::class.java))
                 finish()
             }

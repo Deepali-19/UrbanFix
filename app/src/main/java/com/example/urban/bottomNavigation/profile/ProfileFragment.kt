@@ -18,10 +18,12 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.example.urban.BuildConfig
 import com.bumptech.glide.Glide
 import com.example.urban.R
 import com.example.urban.loginSingUp.AppwriteManager
 import com.example.urban.loginSingUp.LoginActivity
+import com.example.urban.loginSingUp.SessionManager
 import com.example.urban.loginSingUp.User
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -239,10 +241,16 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
             cameraIcon.isEnabled = false
             try {
                 val file = uriToFile(uri)
-                val bucketId = "6999717e003beb1ccaba"
+                val bucketId = BuildConfig.APPWRITE_BUCKET_ID
+                if (bucketId.isBlank()) {
+                    toast("Missing Appwrite upload configuration")
+                    return@launch
+                }
                 val result = appwriteManager.uploadImage(bucketId, file)
-                val imageUrl =
-                    "https://fra.cloud.appwrite.io/v1/storage/buckets/${result.bucketId}/files/${result.id}/view?project=699971230022a191cce2"
+                val imageUrl = AppwriteManager.buildFileViewUrl(
+                    fileId = result.id,
+                    bucketId = result.bucketId
+                )
 
                 val uid = auth.currentUser?.uid ?: return@launch
                 database.child("Users").child(uid)
@@ -337,6 +345,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
     private fun logoutUser() {
         auth.signOut()
+        SessionManager.clear(requireContext())
         startActivity(Intent(requireContext(), LoginActivity::class.java))
         requireActivity().finish()
     }

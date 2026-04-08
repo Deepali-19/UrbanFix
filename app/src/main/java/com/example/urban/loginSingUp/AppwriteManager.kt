@@ -1,17 +1,18 @@
 package com.example.urban.loginSingUp
 
 import android.content.Context
+import com.example.urban.BuildConfig
 import io.appwrite.Client
 import io.appwrite.ID
-import io.appwrite.services.Storage
 import io.appwrite.models.InputFile
+import io.appwrite.services.Storage
 import java.io.File
 
 class AppwriteManager private constructor(context: Context) {
 
     private val client = Client(context)
-        .setEndpoint("https://fra.cloud.appwrite.io/v1")
-        .setProject("699971230022a191cce2")
+        .setEndpoint(BuildConfig.APPWRITE_ENDPOINT)
+        .setProject(BuildConfig.APPWRITE_PROJECT_ID)
 
     private val storage = Storage(client)
 
@@ -25,6 +26,10 @@ class AppwriteManager private constructor(context: Context) {
                     INSTANCE = it
                 }
             }
+        }
+
+        fun buildFileViewUrl(fileId: String, bucketId: String): String {
+            return "${BuildConfig.APPWRITE_ENDPOINT}/storage/buckets/$bucketId/files/$fileId/view?project=${BuildConfig.APPWRITE_PROJECT_ID}"
         }
     }
 

@@ -9,6 +9,7 @@ import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import com.example.urban.loginSingUp.LoginActivity
+import com.example.urban.loginSingUp.SessionManager
 import com.example.urban.bottomNavigation.DashboardActivity
 import com.google.firebase.auth.FirebaseAuth
 
@@ -49,10 +50,20 @@ class MainActivity : AppCompatActivity() {
 
             val user = FirebaseAuth.getInstance().currentUser
 
-            if (user != null) {
+            if (user != null && !SessionManager.isExpired(this)) {
+                SessionManager.refreshActivity(this)
                 startActivity(Intent(this, DashboardActivity::class.java))
             } else {
-                startActivity(Intent(this, LoginActivity::class.java))
+                if (user != null) {
+                    FirebaseAuth.getInstance().signOut()
+                    SessionManager.clear(this)
+                }
+                startActivity(Intent(this, LoginActivity::class.java).apply {
+                    putExtra(SessionManager.EXTRA_SESSION_EXPIRED, user != null)
+                    if (user != null) {
+                        putExtra(SessionManager.EXTRA_SESSION_MESSAGE, "Session expired. Please login again.")
+                    }
+                })
             }
 
             finish()

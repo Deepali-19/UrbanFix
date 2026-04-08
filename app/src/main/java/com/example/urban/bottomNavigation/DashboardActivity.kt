@@ -1,8 +1,11 @@
 package com.example.urban.bottomNavigation
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import android.widget.ImageView
 import android.widget.TextView
@@ -26,6 +29,8 @@ import com.example.urban.bottomNavigation.drawer.FO.FieldOfficerFragment
 import com.example.urban.bottomNavigation.home.HomeFragment
 import com.example.urban.bottomNavigation.map.MapFragment
 import com.example.urban.bottomNavigation.profile.ProfileFragment
+import com.example.urban.loginSingUp.LoginActivity
+import com.example.urban.loginSingUp.SessionManager
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
@@ -55,6 +60,14 @@ class DashboardActivity : AppCompatActivity() {
     private var adminMessageListener: ChildEventListener? = null
     private var adminMessageRef: DatabaseReference? = null
     private val knownAdminMessageKeys = mutableSetOf<String>()
+    private val sessionHandler = Handler(Looper.getMainLooper())
+    private val sessionTimeoutRunnable = Runnable {
+        if (SessionManager.isExpired(this)) {
+            redirectToLogin(sessionExpired = true)
+        } else {
+            scheduleSessionTimeout()
+        }
+    }
 
     private val auth = FirebaseAuth.getInstance()
     private val database = FirebaseDatabase.getInstance().reference
@@ -80,6 +93,7 @@ class DashboardActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
         AlertNotifier.ensureChannel(this)
         requestNotificationPermissionIfNeeded()
+        SessionManager.refreshActivity(this)
 
         // ================= BOTTOM NAVIGATION =================
         bottomNav.setOnItemSelectedListener {
@@ -210,15 +224,20 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
 
     private fun fetchUserRole() {
 
-        val uid = auth.currentUser?.uid ?: return
+        val uid = auth.currentUser?.uid ?: run {
+            redirectToLogin(sessionExpired = false)
+            return
+        }
 
         database.child("Users")
             .child(uid)
             .get()
             .addOnSuccessListener {
-
-                val role = it.child("role").value.toString()
+                val role = resolveRole(it.child("role").value?.toString())
                 setupBottomNav(role)
+            }
+            .addOnFailureListener {
+                redirectToLogin(sessionExpired = false)
             }
     }
 
@@ -376,6 +395,40 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
     private fun DataSnapshot.readAdminMessageValue(childKey: String): String =
         child(childKey).value?.toString()?.trim().orEmpty()
 
+    private fun resolveRole(rawRole: String?): String {
+        return when (rawRole?.trim()) {
+            "Super Admin" -> "Super Admin"
+            "Department Admin" -> "Department Admin"
+            "Field Officer" -> "Field Officer"
+            else -> "Department Admin"
+        }
+    }
+
+    private fun touchSession() {
+        SessionManager.refreshActivity(this)
+        scheduleSessionTimeout()
+    }
+
+    private fun scheduleSessionTimeout() {
+        sessionHandler.removeCallbacks(sessionTimeoutRunnable)
+        sessionHandler.postDelayed(sessionTimeoutRunnable, SessionManager.TIMEOUT_MS)
+    }
+
+    private fun redirectToLogin(sessionExpired: Boolean) {
+        stopAdminMessageListener()
+        sessionHandler.removeCallbacks(sessionTimeoutRunnable)
+        auth.signOut()
+        SessionManager.clear(this)
+        startActivity(Intent(this, LoginActivity::class.java).apply {
+            putExtra(SessionManager.EXTRA_SESSION_EXPIRED, sessionExpired)
+            if (sessionExpired) {
+                putExtra(SessionManager.EXTRA_SESSION_MESSAGE, "Session expired due to inactivity.")
+            }
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        })
+        finish()
+    }
+
     // ================= DRAWER USER =================
 
     private fun loadDrawerUserData() {
@@ -451,7 +504,33 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         return super.onOptionsItemSelected(item)
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (auth.currentUser == null) {
+            redirectToLogin(sessionExpired = false)
+            return
+        }
+
+        if (SessionManager.isExpired(this)) {
+            redirectToLogin(sessionExpired = true)
+            return
+        }
+
+        touchSession()
+    }
+
+    override fun onPause() {
+        sessionHandler.removeCallbacks(sessionTimeoutRunnable)
+        super.onPause()
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        touchSession()
+    }
+
     override fun onDestroy() {
+        sessionHandler.removeCallbacks(sessionTimeoutRunnable)
         super.onDestroy()
         stopAdminMessageListener()
     }

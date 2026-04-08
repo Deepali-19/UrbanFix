@@ -3,12 +3,14 @@ package com.example.urban.loginSingUp
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.example.urban.BuildConfig
 import com.example.urban.databinding.ActivitySingUpBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DatabaseReference
@@ -72,6 +74,27 @@ class SingUpActivity : AppCompatActivity() {
         binding.actDepartment.setAdapter(
             ArrayAdapter(this, android.R.layout.simple_list_item_1, departments)
         )
+
+        binding.actRole.keyListener = null
+        binding.actDepartment.keyListener = null
+
+        binding.actRole.setOnClickListener { binding.actRole.showDropDown() }
+        binding.actDepartment.setOnClickListener { binding.actDepartment.showDropDown() }
+
+        binding.actRole.setOnItemClickListener { _, _, _, _ ->
+            updateDepartmentVisibility(binding.actRole.text?.toString().orEmpty())
+        }
+
+        updateDepartmentVisibility(binding.actRole.text?.toString().orEmpty())
+    }
+
+    private fun updateDepartmentVisibility(role: String) {
+        val isSuperAdmin = role == "Super Admin"
+        binding.tilDepartment.visibility = if (isSuperAdmin) View.GONE else View.VISIBLE
+        if (isSuperAdmin) {
+            binding.actDepartment.setText("", false)
+            binding.tilDepartment.error = null
+        }
     }
 
     private fun isValidPassword(password: String): Boolean {
@@ -92,6 +115,21 @@ class SingUpActivity : AppCompatActivity() {
 
         if (name.isEmpty() || email.isEmpty() || password.isEmpty() || confirm.isEmpty()) {
             toast("Fill all required fields")
+            return
+        }
+
+        if (role.isEmpty()) {
+            toast("Select a role")
+            return
+        }
+
+        if (role != "Super Admin" && department.isEmpty()) {
+            toast("Select a department")
+            return
+        }
+
+        if (city.isEmpty() || employeeId.isEmpty()) {
+            toast("Add city and employee ID")
             return
         }
 
@@ -123,7 +161,7 @@ class SingUpActivity : AppCompatActivity() {
                     name = name,
                     email = email,
                     role = role,
-                    department = department,
+                    department = if (role == "Super Admin") "All Departments" else department,
                     city = city,
                     deviceToken = "",   // will update later from FCM
                     latitude = 0.0,
@@ -138,6 +176,8 @@ class SingUpActivity : AppCompatActivity() {
                     .child(uid)
                     .setValue(user)
 
+                auth.signOut()
+                SessionManager.clear(this)
                 toast("Account created successfully")
 
                 startActivity(Intent(this, LoginActivity::class.java))
@@ -211,16 +251,17 @@ class SingUpActivity : AppCompatActivity() {
     private fun startUpload(file: File) {
         lifecycleScope.launch {
             try {
-
-                val bucketId = "6999717e003beb1ccaba"
-                val projectId = "699971230022a191cce2"
-                val endpoint = "https://fra.cloud.appwrite.io/v1"
-
+                val bucketId = BuildConfig.APPWRITE_BUCKET_ID
+                if (bucketId.isBlank()) {
+                    toast("Missing Appwrite upload configuration")
+                    return@launch
+                }
                 val result = appwriteManager.uploadImage(bucketId, file)
 
-                //  CREATE FULL URL
-                uploadedImageUrl =
-                    "$endpoint/storage/buckets/${result.bucketId}/files/${result.id}/view?project=$projectId"
+                uploadedImageUrl = AppwriteManager.buildFileViewUrl(
+                    fileId = result.id,
+                    bucketId = result.bucketId
+                )
 
                 toast("ID uploaded successfully")
 
@@ -229,24 +270,6 @@ class SingUpActivity : AppCompatActivity() {
             }
         }
     }
-//    private fun startUpload(file: File) {
-//
-//        lifecycleScope.launch {
-//            try {
-//                val bucketId = "6999717e003beb1ccaba"
-//
-//                val result = appwriteManager.uploadImage(bucketId, file)
-//
-//                uploadedImageUrl = result.id
-//
-//                toast("ID uploaded successfully")
-//
-//            } catch (e: Exception) {
-//                toast(e.message ?: "Upload failed")
-//            }
-//        }
-//    }
-
     private fun uriToFile(uri: Uri): File {
         val inputStream = contentResolver.openInputStream(uri)
         val tempFile = File(cacheDir, "image.jpg")

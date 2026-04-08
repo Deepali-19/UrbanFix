@@ -44,12 +44,16 @@ class FieldOfficerAdapter (
             holder.name.text = officer.name
             holder.dept.text = "Dept: ${officer.department}"
             holder.phone.text = metaText
-            holder.count.text = "In Progress: ${officer.inProgressCount}"
+            holder.count.text = "Assigned: ${officer.assignedCount} • Active: ${officer.inProgressCount} • Resolved: ${officer.resolvedCount}"
 
             if (officer.profileImageUrl.isNotEmpty()) {
                 Glide.with(holder.itemView.context)
                     .load(officer.profileImageUrl)
+                    .placeholder(R.drawable.users)
+                    .error(R.drawable.users)
                     .into(holder.img)
+            } else {
+                holder.img.setImageResource(R.drawable.users)
             }
 
             holder.itemView.setOnClickListener {

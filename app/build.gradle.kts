@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +8,41 @@ plugins {
 
     id("kotlin-kapt")
 }
+
+val secretsProperties = Properties().apply {
+    val secretsFile = rootProject.file("secrets.properties")
+    if (secretsFile.exists()) {
+        secretsFile.inputStream().use(::load)
+    }
+}
+
+val localProperties = Properties().apply {
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        localFile.inputStream().use(::load)
+    }
+}
+
+fun configValue(key: String, default: String = ""): String {
+    return sequenceOf(
+        secretsProperties.getProperty(key),
+        localProperties.getProperty(key),
+        System.getenv(key),
+        default
+    ).firstOrNull { !it.isNullOrBlank() }?.trim().orEmpty()
+}
+
+fun quoted(value: String): String {
+    val escaped = value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+    return "\"$escaped\""
+}
+
+val mapsApiKey = configValue("MAPS_API_KEY")
+val appwriteEndpoint = configValue("APPWRITE_ENDPOINT", "https://fra.cloud.appwrite.io/v1")
+val appwriteProjectId = configValue("APPWRITE_PROJECT_ID")
+val appwriteBucketId = configValue("APPWRITE_BUCKET_ID")
 
 android {
     namespace = "com.example.urban"
@@ -21,6 +58,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        resValue("string", "google_maps_key", quoted(mapsApiKey))
+        buildConfigField("String", "APPWRITE_ENDPOINT", quoted(appwriteEndpoint))
+        buildConfigField("String", "APPWRITE_PROJECT_ID", quoted(appwriteProjectId))
+        buildConfigField("String", "APPWRITE_BUCKET_ID", quoted(appwriteBucketId))
     }
     packaging {
         resources {
@@ -51,7 +93,10 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
-    buildFeatures.viewBinding=true
+    buildFeatures {
+        viewBinding = true
+        buildConfig = true
+    }
 }
 
 dependencies {
