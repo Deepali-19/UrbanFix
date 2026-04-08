@@ -160,10 +160,11 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                         return
                     }
 
-                    complaint.firebaseKey = snapshot.key.orEmpty()
-                    currentComplaint = complaint
-                    bindComplaint(complaint)
-                    maybeMarkComplaintAsRead(complaint)
+                    val hydratedComplaint = hydrateComplaint(snapshot, complaint)
+                    hydratedComplaint.firebaseKey = snapshot.key.orEmpty()
+                    currentComplaint = hydratedComplaint
+                    bindComplaint(hydratedComplaint)
+                    maybeMarkComplaintAsRead(hydratedComplaint)
                     isComplaintLoaded = true
                     updateLoadingState()
                 }
@@ -246,7 +247,69 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             loadAssignedOfficerName(complaint.allottedOfficerId)
         }
 
+        if (complaint.phone <= 0L && complaint.civilianId.isNotBlank()) {
+            loadCivilianPhone(complaint.civilianId)
+        }
+
         preselectAssignedOfficer(complaint.allottedOfficerId)
+    }
+
+    private fun hydrateComplaint(snapshot: DataSnapshot, complaint: Complaint): Complaint {
+        val timestamp = complaint.timestamp.takeIf { it > 0L }
+            ?: snapshot.readLong("timestamp", "timeStamp", "createdAt", "reportedOn")
+            ?: 0L
+        val phone = complaint.phone.takeIf { it > 0L }
+            ?: snapshot.readLong("phone", "mobile", "contact", "citizenPhone")
+            ?: 0L
+        val latitude = complaint.latitude.takeIf { it != 0.0 }
+            ?: snapshot.readDouble("latitude", "lat")
+            ?: 0.0
+        val longitude = complaint.longitude.takeIf { it != 0.0 }
+            ?: snapshot.readDouble("longitude", "lng", "lon")
+            ?: 0.0
+        val location = complaint.location.takeIf { it.isNotBlank() }
+            ?: snapshot.readString("location", "address", "selectedLocation")
+            ?: ""
+
+        return complaint.copy(
+            complaintId = complaint.complaintId.ifBlank {
+                snapshot.readString("complaintId", "id") ?: ""
+            },
+            issueType = complaint.issueType.ifBlank {
+                snapshot.readString("issueType", "category", "issue") ?: ""
+            },
+            title = complaint.title.ifBlank {
+                snapshot.readString("title", "subject") ?: ""
+            },
+            description = complaint.description.ifBlank {
+                snapshot.readString("description", "details") ?: ""
+            },
+            civilianId = complaint.civilianId.ifBlank {
+                snapshot.readString("civilianId", "userId", "citizenId") ?: ""
+            },
+            phone = phone,
+            location = location,
+            latitude = latitude,
+            longitude = longitude,
+            timestamp = timestamp,
+            departmentId = complaint.departmentId.ifBlank {
+                snapshot.readString("departmentId", "department") ?: ""
+            }
+        )
+    }
+
+    private fun loadCivilianPhone(civilianId: String) {
+        database.child("Users").child(civilianId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val fallbackPhone = snapshot.readLong("phone", "mobile", "contact", "citizenPhone") ?: return@addOnSuccessListener
+                if (fallbackPhone <= 0L) return@addOnSuccessListener
+
+                currentComplaint = currentComplaint?.copy(phone = fallbackPhone)?.also {
+                    it.firebaseKey = complaintKey.orEmpty()
+                }
+                tvPhoneValue.text = fallbackPhone.toString()
+            }
     }
 
     private fun bindStatusBadge(status: Int) {
@@ -656,6 +719,50 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         currentComplaint = complaint.copy(readByAdmin = true).also {
             it.firebaseKey = complaint.firebaseKey
         }
+    }
+
+    private fun DataSnapshot.readString(vararg keys: String): String? {
+        for (key in keys) {
+            val value = child(key).value?.toString()?.trim().orEmpty()
+            if (value.isNotBlank() && value.lowercase(Locale.getDefault()) != "null") {
+                return value
+            }
+        }
+        return null
+    }
+
+    private fun DataSnapshot.readLong(vararg keys: String): Long? {
+        for (key in keys) {
+            val rawValue = child(key).value ?: continue
+            val parsed = when (rawValue) {
+                is Long -> rawValue
+                is Int -> rawValue.toLong()
+                is Double -> rawValue.toLong()
+                is String -> rawValue.trim().toLongOrNull()
+                else -> null
+            }
+            if (parsed != null && parsed > 0L) {
+                return parsed
+            }
+        }
+        return null
+    }
+
+    private fun DataSnapshot.readDouble(vararg keys: String): Double? {
+        for (key in keys) {
+            val rawValue = child(key).value ?: continue
+            val parsed = when (rawValue) {
+                is Double -> rawValue
+                is Long -> rawValue.toDouble()
+                is Int -> rawValue.toDouble()
+                is String -> rawValue.trim().toDoubleOrNull()
+                else -> null
+            }
+            if (parsed != null && parsed != 0.0) {
+                return parsed
+            }
+        }
+        return null
     }
 
     companion object {
