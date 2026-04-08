@@ -18,6 +18,8 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
 import com.example.urban.R
+import com.example.urban.bottomNavigation.alert.AlertItem
+import com.example.urban.bottomNavigation.alert.AlertStorage
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -28,6 +30,7 @@ import com.google.firebase.database.ValueEventListener
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
 class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
 
@@ -176,7 +179,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         val displayId = complaint.complaintId.ifBlank {
             complaint.firebaseKey.ifBlank { "N/A" }
         }
-        val hasCoordinates = complaint.latitude != 0.0 || complaint.longitude != 0.0
+        val hasCoordinates = ComplaintDataFormatter.hasCoordinates(complaint)
         val hasImage = complaint.images.isNotEmpty() && complaint.images.first().isNotBlank()
 
         tvTitle.text = complaint.title.ifBlank { "Complaint Details" }
@@ -184,12 +187,8 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         tvDescription.text = complaint.description.ifBlank { "No description provided" }
         tvIssueType.text = complaint.issueType.ifBlank { "Not specified" }
         tvDepartment.text = ComplaintDataFormatter.resolvedDepartment(complaint)
-        tvLocation.text = complaint.location.ifBlank { "Not available" }
-        tvCoordinates.text = if (hasCoordinates) {
-            "${complaint.latitude}, ${complaint.longitude}"
-        } else {
-            "Not available"
-        }
+        tvLocation.text = ComplaintDataFormatter.locationLabel(complaint)
+        tvCoordinates.text = ComplaintDataFormatter.coordinatesLabel(complaint)
         tvDate.text = if (complaint.timestamp > 0L) {
             SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
                 .format(Date(complaint.timestamp))
@@ -295,6 +294,27 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .child(key)
             .updateChildren(update)
             .addOnSuccessListener {
+                saveLocalAlert(
+                    title = when (status) {
+                        2 -> "Complaint resolved"
+                        1 -> "Complaint in progress"
+                        else -> "Complaint updated"
+                    },
+                    body = buildString {
+                        append(complaint.title.ifBlank { "Complaint" })
+                        append(" was updated by the field officer.")
+                        if (remark.isNotBlank()) {
+                            append(" Remark: ")
+                            append(remark)
+                        }
+                    },
+                    type = when (status) {
+                        2 -> "Resolved"
+                        else -> "Complaint Update"
+                    },
+                    complaint = complaint,
+                    complaintKey = key
+                )
                 Toast.makeText(requireContext(), "Complaint updated", Toast.LENGTH_SHORT).show()
                 if (status == 2) {
                     sendSMS(complaint.phone, complaint.complaintId.ifBlank { key })
@@ -348,6 +368,23 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .child(key)
             .updateChildren(updates)
             .addOnSuccessListener {
+                val alertType = if (updates.containsKey("allottedOfficerId")) {
+                    "Assignment"
+                } else {
+                    "Complaint Update"
+                }
+                val alertBody = if (updates.containsKey("allottedOfficerId")) {
+                    "A field officer was assigned to ${complaint.title.ifBlank { "this complaint" }}."
+                } else {
+                    "${complaint.title.ifBlank { "Complaint" }} settings were updated by admin."
+                }
+                saveLocalAlert(
+                    title = if (alertType == "Assignment") "Officer assigned" else "Complaint settings saved",
+                    body = alertBody,
+                    type = alertType,
+                    complaint = complaint,
+                    complaintKey = key
+                )
                 Toast.makeText(requireContext(), "Complaint settings saved", Toast.LENGTH_SHORT).show()
                 loadComplaint()
             }
@@ -411,6 +448,28 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         if (intent.resolveActivity(requireContext().packageManager) != null) {
             startActivity(intent)
         }
+    }
+
+    // Local alerts keep the Alerts tab useful during app-side testing even before external FCM senders are connected.
+    private fun saveLocalAlert(
+        title: String,
+        body: String,
+        type: String,
+        complaint: Complaint,
+        complaintKey: String
+    ) {
+        AlertStorage.addAlert(
+            requireContext(),
+            AlertItem(
+                id = UUID.randomUUID().toString(),
+                title = title,
+                body = body,
+                type = type,
+                timestamp = System.currentTimeMillis(),
+                complaintKey = complaintKey,
+                complaintDisplayId = complaint.complaintId.ifBlank { complaintKey }
+            )
+        )
     }
 
     private fun loadUserRole() {

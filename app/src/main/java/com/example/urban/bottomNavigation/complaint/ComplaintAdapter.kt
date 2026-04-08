@@ -36,7 +36,8 @@ class ComplaintAdapter(
         val displayId = complaint.complaintId.ifBlank {
             complaint.firebaseKey.ifBlank { "No ID" }
         }
-        val locationText = complaint.location.ifBlank { "Location not available" }
+        val locationText = ComplaintDataFormatter.locationLabel(complaint)
+        val coordinatesText = ComplaintDataFormatter.coordinatesLabel(complaint)
         val departmentText = ComplaintDataFormatter.resolvedDepartment(complaint)
         val dateText = if (complaint.timestamp > 0L) {
             SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
@@ -55,6 +56,13 @@ class ComplaintAdapter(
 
         holder.binding.tvTitle.text = complaint.title.ifBlank { "Untitled complaint" }
         holder.binding.tvLocation.text = locationText
+        holder.binding.tvCoordinates.text = coordinatesText
+        holder.binding.tvCoordinates.visibility =
+            if (ComplaintDataFormatter.hasCoordinates(complaint)) {
+                android.view.View.VISIBLE
+            } else {
+                android.view.View.GONE
+            }
         holder.binding.tvDepartment.text = departmentText
 
         holder.binding.tvAssigned.text =

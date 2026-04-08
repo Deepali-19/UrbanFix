@@ -23,6 +23,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         private const val KEY_DEPARTMENT = "department"
         private const val KEY_SORT = "sort"
         private const val KEY_RANGE = "range"
+        private const val KEY_COMPLAINT_KEYS = "complaint_keys"
 
         private val APP_DEPARTMENTS = listOf(
             "Water",
@@ -36,14 +37,16 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
             priority: String? = null,
             department: String? = null,
             sort: String? = null,
-            range: String? = null
+            range: String? = null,
+            complaintKeys: ArrayList<String>? = null
         ): Bundle {
             return bundleOf(
                 KEY_STATUS to status,
                 KEY_PRIORITY to priority,
                 KEY_DEPARTMENT to department,
                 KEY_SORT to sort,
-                KEY_RANGE to range
+                KEY_RANGE to range,
+                KEY_COMPLAINT_KEYS to complaintKeys
             )
         }
     }
@@ -63,6 +66,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
     private var pendingDepartmentFilter: String? = null
     private var pendingSortFilter: String? = null
     private var pendingRangeFilter: String? = null
+    private var pendingComplaintKeys: ArrayList<String>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,6 +80,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
             pendingDepartmentFilter = bundle.getString(KEY_DEPARTMENT)
             pendingSortFilter = bundle.getString(KEY_SORT)
             pendingRangeFilter = bundle.getString(KEY_RANGE)
+            pendingComplaintKeys = bundle.getStringArrayList(KEY_COMPLAINT_KEYS)
             applyPendingDashboardFilters()
         }
     }
@@ -215,10 +220,11 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
         val filteredComplaints = allComplaints
             .filter { complaint ->
-                matchesStatus(complaint, selectedStatus) &&
-                    matchesPriority(complaint, selectedPriority) &&
-                    matchesDepartment(complaint, selectedDepartment) &&
-                    matchesDashboardRange(complaint, pendingRangeFilter)
+                    matchesStatus(complaint, selectedStatus) &&
+                        matchesPriority(complaint, selectedPriority) &&
+                        matchesDepartment(complaint, selectedDepartment) &&
+                        matchesComplaintSelection(complaint, pendingComplaintKeys) &&
+                        matchesDashboardRange(complaint, pendingRangeFilter)
             }
             .sortedWith(sortComparator(selectedSort))
 
@@ -269,6 +275,17 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
             "electricity" -> "Electricity"
             else -> value.trim()
         }
+    }
+
+    // Map drill-down can pass a hidden set of complaint keys so the list opens on one hotspot only.
+    private fun matchesComplaintSelection(
+        complaint: Complaint,
+        requestedComplaintKeys: ArrayList<String>?
+    ): Boolean {
+        if (requestedComplaintKeys.isNullOrEmpty()) return true
+
+        val complaintKey = complaint.firebaseKey.ifBlank { complaint.complaintId }
+        return complaintKey in requestedComplaintKeys
     }
 
     // Dashboard can pass a hidden time window so drill-down stays scoped.

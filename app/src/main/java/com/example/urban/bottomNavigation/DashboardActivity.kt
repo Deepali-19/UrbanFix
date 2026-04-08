@@ -1,17 +1,26 @@
 package com.example.urban.bottomNavigation
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Toast
 import android.widget.ImageView
 import android.widget.TextView
 import android.view.Menu
 import android.view.MenuItem
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.content.ContextCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.core.view.GravityCompat
 import com.bumptech.glide.Glide
 import com.example.urban.R
 import com.example.urban.bottomNavigation.alert.AlertsFragment
+import com.example.urban.bottomNavigation.alert.AlertNotifier
+import com.example.urban.bottomNavigation.alert.AlertItem
+import com.example.urban.bottomNavigation.alert.AlertStorage
 import com.example.urban.bottomNavigation.complaint.ComplaintFragment
 import com.example.urban.bottomNavigation.drawer.FO.FieldOfficerFragment
 import com.example.urban.bottomNavigation.home.HomeFragment
@@ -21,10 +30,19 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.ChildEventListener
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.messaging.FirebaseMessaging
+import java.util.UUID
 
 class DashboardActivity : AppCompatActivity() {
+
+    companion object {
+        const val EXTRA_OPEN_ALERTS = "open_alerts"
+    }
 
     private lateinit var bottomNav: BottomNavigationView
     private lateinit var drawerLayout: DrawerLayout
@@ -33,14 +51,21 @@ class DashboardActivity : AppCompatActivity() {
 
     private var currentFragment: Fragment? = null
     private var isFreshLaunch = false
+    private var openAlertsFromIntent = false
+    private var adminMessageListener: ChildEventListener? = null
+    private var adminMessageRef: DatabaseReference? = null
+    private val knownAdminMessageKeys = mutableSetOf<String>()
 
     private val auth = FirebaseAuth.getInstance()
     private val database = FirebaseDatabase.getInstance().reference
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_dashboard)
         isFreshLaunch = savedInstanceState == null
+        openAlertsFromIntent = intent.getBooleanExtra(EXTRA_OPEN_ALERTS, false)
 
         // ================= INIT =================
         bottomNav = findViewById(R.id.bottomNav)
@@ -48,7 +73,13 @@ class DashboardActivity : AppCompatActivity() {
         navDrawer = findViewById(R.id.navDrawer)
         toolbar = findViewById(R.id.topBar)
 
+        // Keep the original multicolor menu drawables visible instead of tinting them to one flat color.
+        bottomNav.itemIconTintList = null
+        bottomNav.itemTextColor = AppCompatResources.getColorStateList(this, R.color.bottom_nav_icon_color)
+
         setSupportActionBar(toolbar)
+        AlertNotifier.ensureChannel(this)
+        requestNotificationPermissionIfNeeded()
 
         // ================= BOTTOM NAVIGATION =================
         bottomNav.setOnItemSelectedListener {
@@ -204,16 +235,25 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
             loadDefaultFragmentForRole(role)
             isFreshLaunch = false
         }
+
+        if (role == "Field Officer") {
+            stopAdminMessageListener()
+        } else {
+            startAdminMessageListener()
+        }
     }
 
     private fun loadDefaultFragmentForRole(role: String) {
-        val defaultItemId = if (role == "Field Officer") {
+        val defaultItemId = if (openAlertsFromIntent) {
+            R.id.nav_alerts
+        } else if (role == "Field Officer") {
             R.id.nav_complaints
         } else {
             R.id.nav_home
         }
 
         bottomNav.selectedItemId = defaultItemId
+        openAlertsFromIntent = false
     }
 
     // ================= FCM =================
@@ -234,6 +274,107 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
                     .setValue(token)
             }
     }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    // Listen to AdminMessages so new civilian reports reach the admin app immediately.
+    private fun startAdminMessageListener() {
+        if (adminMessageRef != null) return
+
+        val ref = FirebaseDatabase.getInstance().getReference("AdminMessages")
+        adminMessageRef = ref
+
+        // Prime the listener with existing message keys so only brand-new admin reports raise alerts.
+        ref.get()
+            .addOnSuccessListener { snapshot ->
+                knownAdminMessageKeys.clear()
+                snapshot.children.mapNotNullTo(knownAdminMessageKeys) { it.key }
+                attachAdminMessageListener(ref)
+            }
+            .addOnFailureListener {
+                // If the warm-up read fails, still attach the live listener so future reports are not missed.
+                knownAdminMessageKeys.clear()
+                attachAdminMessageListener(ref)
+            }
+    }
+
+    private fun attachAdminMessageListener(ref: DatabaseReference) {
+        if (adminMessageListener != null) return
+
+        adminMessageListener = object : ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                val messageKey = snapshot.key.orEmpty()
+                if (messageKey.isNotBlank() && !knownAdminMessageKeys.add(messageKey)) return
+
+                val alert = buildAdminMessageAlert(snapshot)
+
+                AlertStorage.addAlert(this@DashboardActivity, alert)
+                AlertNotifier.show(this@DashboardActivity, alert)
+                Toast.makeText(
+                    this@DashboardActivity,
+                    "NEW REPORT: ${alert.title}\nID: ${alert.complaintDisplayId.ifBlank { "N/A" }}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) = Unit
+
+            override fun onChildRemoved(snapshot: DataSnapshot) = Unit
+
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) = Unit
+
+            override fun onCancelled(error: DatabaseError) = Unit
+        }
+
+        ref.addChildEventListener(adminMessageListener as ChildEventListener)
+    }
+
+    private fun buildAdminMessageAlert(snapshot: DataSnapshot): AlertItem {
+        // Support the civilian-side field names exactly as shared, including older typo variants.
+        val title = snapshot.readAdminMessageValue("title")
+            .ifBlank { snapshot.readAdminMessageValue("tle") }
+            .ifBlank { snapshot.readAdminMessageValue(" tle") }
+            .ifBlank { "New Report" }
+        val body = snapshot.readAdminMessageValue("body")
+            .ifBlank { "A new complaint report has been received." }
+        val linkedComplaintId = snapshot.readAdminMessageValue("complaintId")
+        val eventTimestamp = snapshot.child("timestamp").getValue(Long::class.java)
+            ?: System.currentTimeMillis()
+
+        return AlertItem(
+            id = snapshot.key ?: UUID.randomUUID().toString(),
+            title = title,
+            body = body,
+            type = "New Report",
+            timestamp = eventTimestamp,
+            complaintKey = linkedComplaintId,
+            complaintDisplayId = linkedComplaintId
+        )
+    }
+
+    private fun stopAdminMessageListener() {
+        val ref = adminMessageRef
+        val listener = adminMessageListener
+        if (ref != null && listener != null) {
+            ref.removeEventListener(listener)
+        }
+
+        adminMessageListener = null
+        adminMessageRef = null
+        knownAdminMessageKeys.clear()
+    }
+
+    private fun DataSnapshot.readAdminMessageValue(childKey: String): String =
+        child(childKey).value?.toString()?.trim().orEmpty()
 
     // ================= DRAWER USER =================
 
@@ -308,6 +449,11 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return super.onOptionsItemSelected(item)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopAdminMessageListener()
     }
 
 }

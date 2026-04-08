@@ -143,6 +143,16 @@
             android:textSize="13sp" />
 
         <TextView
+            android:id="@+id/tvCoordinates"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="31.32602, 75.57618"
+            android:textColor="#7A8599"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/tvAssigned"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
