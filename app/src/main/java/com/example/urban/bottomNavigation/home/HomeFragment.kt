@@ -14,6 +14,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.urban.R
 import com.example.urban.bottomNavigation.complaint.Complaint
 import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
+import com.example.urban.bottomNavigation.complaint.ComplaintEtaManager
 import com.example.urban.bottomNavigation.complaint.ComplaintFragment
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.LineChart
@@ -265,6 +266,7 @@ class HomeFragment : Fragment() {
                 }
 
                 allVisibleComplaints = visibleComplaints
+                syncEtaForVisibleComplaints(visibleComplaints)
                 bindMetrics()
                 finishRefreshState()
                 showLoading(false)
@@ -283,22 +285,37 @@ class HomeFragment : Fragment() {
         swipeRefreshLayout.isRefreshing = false
     }
 
+    private fun syncEtaForVisibleComplaints(complaints: List<Complaint>) {
+        if (currentRole == "Field Officer") return
+
+        val etaUpdates = ComplaintEtaManager.buildEtaUpdates(complaints)
+        etaUpdates.forEach { (complaintKey, updates) ->
+            complaintsRef.child(complaintKey).updateChildren(updates)
+        }
+    }
+
     private fun bindHeader() {
-        val firstName = currentName.trim().split(" ").firstOrNull().orEmpty().ifBlank { "User" }
+        val firstName = currentName.trim().split(" ").firstOrNull().orEmpty().ifBlank { getString(R.string.generic_user) }
         val greetingPrefix = when (LocalTime.now().hour) {
-            in 5..11 -> "Good morning"
-            in 12..16 -> "Good afternoon"
-            in 17..20 -> "Good evening"
-            else -> "Welcome back"
+            in 5..11 -> getString(R.string.dashboard_greeting_morning)
+            in 12..16 -> getString(R.string.dashboard_greeting_afternoon)
+            in 17..20 -> getString(R.string.dashboard_greeting_evening)
+            else -> getString(R.string.dashboard_greeting_welcome_back)
         }
 
-        tvGreeting.text = "$greetingPrefix, $firstName"
-        tvScopeTag.text = currentScopeLabel
+        tvGreeting.text = getString(R.string.dashboard_greeting_with_name, greetingPrefix, firstName)
+        tvScopeTag.text = localizedRoleLabel(currentScopeLabel)
         tvSubtitle.text = when (currentRole) {
-            "Super Admin" -> "City-wide complaint performance and activity overview."
-            "Department Admin" -> "${currentDepartment.ifBlank { "Department" }} complaints, priorities, and SLA movement."
-            "Field Officer" -> "Your assigned complaint activity and progress overview."
-            else -> "Complaint activity overview."
+            "Super Admin" -> getString(R.string.dashboard_subtitle_super_admin)
+            "Department Admin" -> getString(
+                R.string.dashboard_subtitle_department_admin,
+                ComplaintDataFormatter.localizedDepartmentName(
+                    requireContext(),
+                    currentDepartment.ifBlank { "General" }
+                )
+            )
+            "Field Officer" -> getString(R.string.dashboard_subtitle_field_officer)
+            else -> getString(R.string.dashboard_subtitle_default)
         }
     }
 
@@ -335,13 +352,13 @@ class HomeFragment : Fragment() {
         currentDisplayRange = DashboardRange.ALL_TIME
         currentMetrics = metrics
 
-        tvRangeCaption.text = "Showing dashboard analytics for all available complaint data."
+        tvRangeCaption.text = getString(R.string.dashboard_range_caption_all)
         tvTrendSubtitle.text = when (currentDisplayRange) {
-            DashboardRange.ALL_TIME -> "Showing overall complaint movement from the available records."
-            DashboardRange.TODAY -> "Track complaint movement across today's timeline."
-            DashboardRange.SEVEN_DAYS -> "Track complaint movement across the last 7 days."
-            DashboardRange.THIRTY_DAYS -> "Track complaint movement across the last 30 days."
-            DashboardRange.THIS_MONTH -> "Track complaint movement across the current month."
+            DashboardRange.ALL_TIME -> getString(R.string.dashboard_trend_subtitle_all)
+            DashboardRange.TODAY -> getString(R.string.dashboard_trend_subtitle_today)
+            DashboardRange.SEVEN_DAYS -> getString(R.string.dashboard_trend_subtitle_seven_days)
+            DashboardRange.THIRTY_DAYS -> getString(R.string.dashboard_trend_subtitle_thirty_days)
+            DashboardRange.THIS_MONTH -> getString(R.string.dashboard_trend_subtitle_this_month)
         }
 
         tvTotal.text = metrics.total.toString()
@@ -352,16 +369,19 @@ class HomeFragment : Fragment() {
         tvToday.text = metrics.todayCount.toString()
         tvMonth.text = metrics.monthCount.toString()
         tvResolutionRate.text = metrics.resolutionRate
-        tvTopDepartment.text = metrics.topDepartment
-        tvNearBreachCount.text = "${metrics.nearBreachCount} near breach"
-        tvOverdueCount.text = "${metrics.overdueCount} overdue"
-        tvActiveOfficers.text = "${metrics.activeOfficers} active officers"
-        tvOverloadedOfficers.text = "${metrics.overloadedOfficers} overloaded"
-        tvTopHandler.text = "Top handler: ${metrics.topHandler}"
+        tvTopDepartment.text = ComplaintDataFormatter.localizedDepartmentName(requireContext(), metrics.topDepartment)
+        tvNearBreachCount.text = getString(R.string.dashboard_near_breach_count, metrics.nearBreachCount)
+        tvOverdueCount.text = getString(R.string.dashboard_overdue_count, metrics.overdueCount)
+        tvActiveOfficers.text = getString(R.string.dashboard_active_officers, metrics.activeOfficers)
+        tvOverloadedOfficers.text = getString(R.string.dashboard_overloaded_officers, metrics.overloadedOfficers)
+        tvTopHandler.text = getString(R.string.dashboard_top_handler, metrics.topHandler)
         tvTopIssueType.text = metrics.topIssueType
         tvAverageResolutionTime.text = metrics.averageResolutionTime
-        tvFastestDepartment.text = "Fastest department: ${metrics.fastestDepartment}"
-        tvLastUpdated.text = "Showing all available complaint data"
+        tvFastestDepartment.text = getString(
+            R.string.dashboard_fastest_department,
+            ComplaintDataFormatter.localizedDepartmentName(requireContext(), metrics.fastestDepartment)
+        )
+        tvLastUpdated.text = getString(R.string.dashboard_last_updated_all_data)
 
         // Keep the dashboard visible whenever complaint data exists, even if the chosen range is empty.
         val hasAnyComplaints = allVisibleComplaints.isNotEmpty()
@@ -371,14 +391,14 @@ class HomeFragment : Fragment() {
 
         if (!hasAnyComplaints) {
             tvEmptyTitle.text = when (currentRole) {
-                "Department Admin" -> "No department complaints yet"
-                "Field Officer" -> "No assigned complaints yet"
-                else -> "No complaints yet"
+                "Department Admin" -> getString(R.string.dashboard_empty_title_department)
+                "Field Officer" -> getString(R.string.dashboard_empty_title_field)
+                else -> getString(R.string.dashboard_empty_title_default)
             }
             tvEmptyBody.text = when (currentRole) {
-                "Department Admin" -> "Once complaints are assigned to your department, this dashboard will start showing live insights."
-                "Field Officer" -> "Assigned complaints will appear here with status, priority, and progress trends."
-                else -> "Once complaints are reported, this dashboard will show their live status and trends."
+                "Department Admin" -> getString(R.string.dashboard_empty_body_department)
+                "Field Officer" -> getString(R.string.dashboard_empty_body_field)
+                else -> getString(R.string.dashboard_empty_body_default)
             }
             clearCharts()
             return
@@ -450,7 +470,7 @@ class HomeFragment : Fragment() {
                     type = "text/plain"
                     putExtra(Intent.EXTRA_TEXT, shareText)
                 },
-                "Share dashboard summary"
+                getString(R.string.dashboard_share_summary_chooser)
             )
         )
     }
@@ -489,7 +509,7 @@ class HomeFragment : Fragment() {
         barChart.axisRight.isEnabled = false
         barChart.setFitBars(true)
         barChart.setDrawGridBackground(false)
-        barChart.setNoDataText("No department data available")
+        barChart.setNoDataText(getString(R.string.dashboard_no_department_data))
         barChart.axisLeft.apply {
             axisMinimum = 0f
             textColor = Color.parseColor("#98A2B3")
@@ -516,7 +536,7 @@ class HomeFragment : Fragment() {
         lineChart.description.isEnabled = false
         lineChart.legend.isEnabled = false
         lineChart.axisRight.isEnabled = false
-        lineChart.setNoDataText("No trend data available")
+        lineChart.setNoDataText(getString(R.string.dashboard_no_trend_data))
         lineChart.axisLeft.apply {
             axisMinimum = 0f
             textColor = Color.parseColor("#98A2B3")
@@ -553,7 +573,7 @@ class HomeFragment : Fragment() {
             setValueTextColor(Color.parseColor("#111827"))
             setValueTextSize(12f)
         }
-        pieChart.centerText = "Status\nOverview"
+        pieChart.centerText = getString(R.string.dashboard_status_overview)
         pieChart.animateY(800)
         pieChart.invalidate()
     }
@@ -571,7 +591,7 @@ class HomeFragment : Fragment() {
             BarEntry(index.toFloat(), (data[label] ?: 0).toFloat())
         }
 
-        val dataSet = BarDataSet(entries, "Departments").apply {
+        val dataSet = BarDataSet(entries, getString(R.string.dashboard_departments)).apply {
             color = Color.parseColor("#3D8BFF")
             valueTextColor = Color.parseColor("#344054")
             valueTextSize = 11f
@@ -594,7 +614,7 @@ class HomeFragment : Fragment() {
             Entry(index.toFloat(), count.toFloat())
         }
 
-        val dataSet = LineDataSet(entries, "Complaint Activity").apply {
+        val dataSet = LineDataSet(entries, getString(R.string.dashboard_complaint_activity)).apply {
             color = Color.parseColor("#5E35B1")
             lineWidth = 3f
             setCircleColor(Color.parseColor("#5E35B1"))
@@ -609,6 +629,15 @@ class HomeFragment : Fragment() {
         lineChart.data = LineData(dataSet)
         lineChart.animateX(800)
         lineChart.invalidate()
+    }
+
+    private fun localizedRoleLabel(role: String): String {
+        return when (role) {
+            "Super Admin" -> getString(R.string.role_super_admin)
+            "Department Admin" -> getString(R.string.role_department_admin)
+            "Field Officer" -> getString(R.string.role_field_officer)
+            else -> role.ifBlank { getString(R.string.toolbar_dashboard) }
+        }
     }
 
     // Inflate the recent feed dynamically so it stays easy to adjust without introducing another adapter.

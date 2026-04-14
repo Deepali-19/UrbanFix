@@ -17,6 +17,7 @@ import androidx.fragment.app.Fragment
 import com.example.urban.R
 import com.example.urban.bottomNavigation.complaint.Complaint
 import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
+import com.example.urban.bottomNavigation.complaint.ComplaintEtaManager
 import com.example.urban.bottomNavigation.complaint.ComplaintDetailFragment
 import com.example.urban.bottomNavigation.complaint.ComplaintFragment
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -965,26 +966,15 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
     }
 
     private fun isNearBreach(complaint: Complaint): Boolean {
-        if (complaint.status == 2 || complaint.timestamp <= 0L) return false
-        val slaHours = slaHoursFor(complaint)
-        val ageHours = (System.currentTimeMillis() - complaint.timestamp) / 3_600_000.0
-        return ageHours in (slaHours * 0.8)..slaHours
+        return ComplaintEtaManager.isNearBreach(complaint)
     }
 
     private fun isOverdue(complaint: Complaint): Boolean {
-        if (complaint.status == 2 || complaint.timestamp <= 0L) return false
-        val ageHours = (System.currentTimeMillis() - complaint.timestamp) / 3_600_000.0
-        return ageHours > slaHoursFor(complaint)
+        return ComplaintEtaManager.isOverdue(complaint)
     }
 
     private fun slaHoursFor(complaint: Complaint): Double {
-        return when (ComplaintDataFormatter.resolvedDepartment(complaint)) {
-            "Sanitation" -> 24.0
-            "Water" -> 48.0
-            "Roads" -> 24.0 * 7
-            "Electricity" -> 48.0
-            else -> 72.0
-        }
+        return ComplaintEtaManager.slaHoursFor(complaint)
     }
 
     override fun onDestroyView() {

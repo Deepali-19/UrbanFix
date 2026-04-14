@@ -54,7 +54,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Urban Fix Admin"
+                    android:text="@string/auth_admin_title"
                     android:textColor="@android:color/white"
                     android:textSize="28sp"
                     android:textStyle="bold" />
@@ -66,7 +66,7 @@
                     android:layout_marginTop="8dp"
                     android:gravity="center"
                     android:lineSpacingExtra="2dp"
-                    android:text="Login to manage complaints, track departments, and coordinate field action."
+                    android:text="@string/auth_login_subtitle"
                     android:textColor="#EAF2FF"
                     android:textSize="14sp" />
 
@@ -79,7 +79,7 @@
                     android:paddingTop="6dp"
                     android:paddingEnd="12dp"
                     android:paddingBottom="6dp"
-                    android:text="Super Admin • Department Admin • Field Officer"
+                    android:text="@string/auth_roles_badge"
                     android:textColor="@android:color/white"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -112,7 +112,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Welcome back"
+                    android:text="@string/auth_welcome_back"
                     android:textColor="#111827"
                     android:textSize="20sp"
                     android:textStyle="bold" />
@@ -121,7 +121,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="Use your official account to continue."
+                    android:text="@string/auth_use_official_account"
                     android:textColor="#667085"
                     android:textSize="13sp" />
 
@@ -140,7 +140,7 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Official email"
+                        android:hint="@string/auth_official_email"
                         android:inputType="textEmailAddress"
                         android:minHeight="56dp"
                         android:paddingStart="25dp"
@@ -163,7 +163,7 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Password"
+                        android:hint="@string/auth_password"
                         android:inputType="textPassword"
                         android:minHeight="56dp"
                         android:paddingStart="25dp"
@@ -182,7 +182,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Remember me"
+                        android:text="@string/auth_remember_me"
                         android:textColor="#344054" />
 
                     <com.google.android.material.button.MaterialButton
@@ -192,7 +192,7 @@
                         android:minWidth="0dp"
                         android:minHeight="0dp"
                         android:paddingHorizontal="0dp"
-                        android:text="Forgot Password"
+                        android:text="@string/auth_forgot_password"
                         android:textAllCaps="false"
                         android:textColor="#0B4CC2"
                         app:backgroundTint="@android:color/transparent" />
@@ -204,7 +204,7 @@
                     android:layout_height="56dp"
                     android:layout_marginTop="16dp"
                     android:backgroundTint="#0B4CC2"
-                    android:text="Login"
+                    android:text="@string/auth_login"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
                     android:textSize="16sp"
@@ -221,7 +221,7 @@
                         android:id="@+id/tvAlreadyAccount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Need an admin account?"
+                        android:text="@string/auth_need_admin_account"
                         android:textColor="#667085"
                         android:textSize="14sp" />
 
@@ -235,7 +235,7 @@
                         android:paddingTop="0dp"
                         android:paddingEnd="0dp"
                         android:paddingBottom="0dp"
-                        android:text="Create one"
+                        android:text="@string/auth_create_one"
                         android:textAllCaps="false"
                         android:textColor="#0B4CC2"
                         android:textSize="14sp"

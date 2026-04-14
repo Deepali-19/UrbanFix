@@ -111,9 +111,9 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         val unreadCount = alerts.count { !it.isRead }
 
         adapter.updateItems(alerts)
-        tvAlertTotal.text = "Total: ${alerts.size}"
-        tvAlertUnread.text = "Unread: $unreadCount"
-        tvAlertRead.text = "Read: ${alerts.size - unreadCount}"
+        tvAlertTotal.text = getString(R.string.summary_total, alerts.size)
+        tvAlertUnread.text = getString(R.string.alerts_unread, unreadCount)
+        tvAlertRead.text = getString(R.string.alerts_read, alerts.size - unreadCount)
 
         emptyState.visibility = if (alerts.isEmpty()) View.VISIBLE else View.GONE
         contentContainer.visibility = View.VISIBLE
@@ -146,35 +146,38 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
             "Super Admin" -> {
                 fabBroadcast.visibility = View.VISIBLE
                 tvBroadcastAccess.visibility = View.VISIBLE
-                tvBroadcastAccess.text = "You can broadcast city-wide notices or department-specific updates."
-                tvAlertSubtitle.text = "FCM alerts, complaint updates, operational notifications, and civilian broadcasts."
+                tvBroadcastAccess.text = getString(R.string.alerts_broadcast_access_super)
+                tvAlertSubtitle.text = getString(R.string.alerts_subtitle_super)
             }
 
             "Department Admin" -> {
                 if (isSupportedDepartment(currentUserDepartment)) {
                     fabBroadcast.visibility = View.VISIBLE
                     tvBroadcastAccess.visibility = View.VISIBLE
-                    tvBroadcastAccess.text = "You can broadcast only to $currentUserDepartment civilians."
-                    tvAlertSubtitle.text = "Department alerts, complaint updates, and broadcast communication live here."
+                    tvBroadcastAccess.text = getString(
+                        R.string.alerts_broadcast_access_department,
+                        currentUserDepartment
+                    )
+                    tvAlertSubtitle.text = getString(R.string.alerts_subtitle_department)
                 } else {
                     fabBroadcast.visibility = View.GONE
                     tvBroadcastAccess.visibility = View.VISIBLE
-                    tvBroadcastAccess.text = "Broadcast is locked until this admin account is mapped to Water, Roads, Sanitation, or Electricity."
-                    tvAlertSubtitle.text = "Complaint updates and operational notifications live here."
+                    tvBroadcastAccess.text = getString(R.string.alerts_broadcast_locked_invalid_department)
+                    tvAlertSubtitle.text = getString(R.string.alerts_subtitle_default)
                 }
             }
 
             else -> {
                 fabBroadcast.visibility = View.GONE
                 tvBroadcastAccess.visibility = View.GONE
-                tvAlertSubtitle.text = "FCM alerts, complaint updates, and operational notifications."
+                tvAlertSubtitle.text = getString(R.string.alerts_subtitle_default)
             }
         }
     }
 
     private fun showBroadcastDialog() {
         if (currentUserRole != "Super Admin" && currentUserRole != "Department Admin") {
-            Toast.makeText(requireContext(), "Broadcast is available only for admin users.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.alerts_broadcast_admin_only), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -194,6 +197,7 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
             tilDepartment.visibility = View.VISIBLE
             tvLockedDepartment.visibility = View.GONE
             tvBroadcastScope.text = "Choose a department or keep it city-wide for all civilians."
+            tvBroadcastScope.text = getString(R.string.alerts_broadcast_scope_super)
             actDepartment.setAdapter(
                 ArrayAdapter(
                     requireContext(),
@@ -209,14 +213,17 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         } else {
             tilDepartment.visibility = View.GONE
             tvLockedDepartment.visibility = View.VISIBLE
-            tvLockedDepartment.text = "Target: ${currentUserDepartment.ifBlank { "Your Department" }} civilians"
-            tvBroadcastScope.text = "Department Admin broadcasts are locked to your own department."
+            tvLockedDepartment.text = getString(
+                R.string.alerts_broadcast_target_department,
+                currentUserDepartment.ifBlank { getString(R.string.alerts_your_department) }
+            )
+            tvBroadcastScope.text = getString(R.string.alerts_broadcast_scope_department)
         }
 
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogView)
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Send", null)
+            .setNegativeButton(R.string.common_cancel, null)
+            .setPositiveButton(R.string.common_send, null)
             .create()
 
         dialog.setOnShowListener {
@@ -235,25 +242,25 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
                 tilDepartment.error = null
 
                 if (title.isBlank()) {
-                    tilTitle.error = "Enter a title"
+                    tilTitle.error = getString(R.string.alerts_enter_title)
                     return@setOnClickListener
                 }
 
                 if (body.isBlank()) {
-                    tilBody.error = "Enter a message"
+                    tilBody.error = getString(R.string.alerts_enter_message)
                     return@setOnClickListener
                 }
 
                 if (currentUserRole == "Super Admin" && targetDepartment.isBlank()) {
-                    tilDepartment.error = "Choose a target department"
+                    tilDepartment.error = getString(R.string.alerts_choose_target_department)
                     return@setOnClickListener
                 }
 
                 if (targetDepartment != "All Departments" && !isSupportedDepartment(targetDepartment)) {
                     if (currentUserRole == "Super Admin") {
-                        tilDepartment.error = "Choose Water, Roads, Sanitation, Electricity, or All Departments"
+                        tilDepartment.error = getString(R.string.alerts_choose_supported_department)
                     } else {
-                        Toast.makeText(requireContext(), "Your admin account needs a valid department to send broadcasts.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), getString(R.string.alerts_invalid_department_account), Toast.LENGTH_SHORT).show()
                     }
                     return@setOnClickListener
                 }
@@ -305,18 +312,18 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
                     requireContext(),
                     AlertItem(
                         id = "broadcast_$pushKey",
-                        title = "Broadcast sent",
-                        body = "$title was sent to $audienceLabel.",
-                        type = "Broadcast",
+                        title = getString(R.string.alerts_broadcast_sent_title),
+                        body = getString(R.string.alerts_broadcast_sent_body, title, audienceLabel),
+                        type = getString(R.string.alert_type_broadcast),
                         timestamp = System.currentTimeMillis()
                     )
                 )
                 refreshAlerts()
-                Toast.makeText(requireContext(), "Broadcast sent to $audienceLabel.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.alerts_broadcast_sent_to, audienceLabel), Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
             }
             .addOnFailureListener { error ->
-                Toast.makeText(requireContext(), error.message ?: "Broadcast failed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), error.message ?: getString(R.string.alerts_broadcast_failed), Toast.LENGTH_SHORT).show()
             }
     }
 

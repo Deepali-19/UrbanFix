@@ -33,17 +33,21 @@ class ComplaintAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
 
         val complaint = list[position]
+        val context = holder.binding.root.context
         val displayId = complaint.complaintId.ifBlank {
-            complaint.firebaseKey.ifBlank { "No ID" }
+            complaint.firebaseKey.ifBlank { context.getString(R.string.complaint_no_id) }
         }
-        val locationText = ComplaintDataFormatter.locationLabel(complaint)
-        val coordinatesText = ComplaintDataFormatter.coordinatesLabel(complaint)
-        val departmentText = ComplaintDataFormatter.resolvedDepartment(complaint)
+        val locationText = ComplaintDataFormatter.localizedLocationLabel(context, complaint)
+        val coordinatesText = ComplaintDataFormatter.localizedCoordinatesLabel(context, complaint)
+        val departmentText = ComplaintDataFormatter.localizedDepartmentName(
+            context,
+            ComplaintDataFormatter.resolvedDepartment(complaint)
+        )
         val dateText = if (complaint.timestamp > 0L) {
             SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
                 .format(Date(complaint.timestamp))
         } else {
-            "No date"
+            context.getString(R.string.complaint_no_date)
         }
 
         holder.binding.tvComplaintId.text = displayId
@@ -54,7 +58,7 @@ class ComplaintAdapter(
                 android.view.View.GONE
             }
 
-        holder.binding.tvTitle.text = complaint.title.ifBlank { "Untitled complaint" }
+        holder.binding.tvTitle.text = complaint.title.ifBlank { context.getString(R.string.complaint_untitled) }
         holder.binding.tvLocation.text = locationText
         holder.binding.tvCoordinates.text = coordinatesText
         holder.binding.tvCoordinates.visibility =
@@ -67,41 +71,42 @@ class ComplaintAdapter(
 
         holder.binding.tvAssigned.text =
             if (complaint.allottedOfficerId.isEmpty())
-                "Not assigned yet"
+                context.getString(R.string.complaint_not_assigned)
             else
-                "Assigned to field officer"
+                context.getString(R.string.complaint_assigned_to_officer)
+        holder.binding.tvEta.text = ComplaintEtaManager.etaShortLabel(complaint)
         holder.binding.tvDateTime.text = dateText
 
         when (complaint.priority) {
             2 -> {
-                holder.binding.tvPriority.text = "High"
+                holder.binding.tvPriority.text = context.getString(R.string.priority_high)
                 holder.binding.tvPriority.setBackgroundResource(R.drawable.priority_high)
             }
 
             1 -> {
-                holder.binding.tvPriority.text = "Medium"
+                holder.binding.tvPriority.text = context.getString(R.string.priority_medium)
                 holder.binding.tvPriority.setBackgroundResource(R.drawable.priority_medium)
             }
 
             else -> {
-                holder.binding.tvPriority.text = "Low"
+                holder.binding.tvPriority.text = context.getString(R.string.priority_low)
                 holder.binding.tvPriority.setBackgroundResource(R.drawable.priority_low)
             }
         }
 
         when (complaint.status) {
             0 -> {
-                holder.binding.tvStatus.text = "Pending"
+                holder.binding.tvStatus.text = context.getString(R.string.status_pending)
                 holder.binding.tvStatus.setBackgroundResource(R.drawable.status_pending)
             }
 
             1 -> {
-                holder.binding.tvStatus.text = "In Progress"
+                holder.binding.tvStatus.text = context.getString(R.string.status_in_progress)
                 holder.binding.tvStatus.setBackgroundResource(R.drawable.status_progress)
             }
 
             2 -> {
-                holder.binding.tvStatus.text = "Resolved"
+                holder.binding.tvStatus.text = context.getString(R.string.status_resolved)
                 holder.binding.tvStatus.setBackgroundResource(R.drawable.status_resolved)
             }
         }

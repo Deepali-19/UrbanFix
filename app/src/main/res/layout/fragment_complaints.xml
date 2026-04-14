@@ -50,7 +50,7 @@
                         android:layout_height="wrap_content"
                         android:cursorVisible="false"
                         android:focusable="false"
-                        android:hint="Status"
+                        android:hint="@string/filter_status"
                         android:importantForAutofill="no"
                         android:inputType="none"
                         android:minHeight="46dp"
@@ -85,7 +85,7 @@
                         android:layout_height="wrap_content"
                         android:cursorVisible="false"
                         android:focusable="false"
-                        android:hint="Priority"
+                        android:hint="@string/filter_priority"
                         android:importantForAutofill="no"
                         android:inputType="none"
                         android:minHeight="46dp"
@@ -117,7 +117,7 @@
             android:gravity="center"
             android:paddingHorizontal="16dp"
             android:paddingVertical="8dp"
-            android:text="No complaints match the selected filters."
+            android:text="@string/complaints_empty_filtered"
             android:textColor="#777777"
             android:textSize="13sp"
             android:visibility="gone" />
@@ -159,7 +159,7 @@
                         android:layout_height="wrap_content"
                         android:cursorVisible="false"
                         android:focusable="false"
-                        android:hint="Department"
+                        android:hint="@string/filter_department"
                         android:importantForAutofill="no"
                         android:inputType="none"
                         android:minHeight="46dp"
@@ -194,7 +194,7 @@
                         android:layout_height="wrap_content"
                         android:cursorVisible="false"
                         android:focusable="false"
-                        android:hint="Sort"
+                        android:hint="@string/filter_sort"
                         android:importantForAutofill="no"
                         android:inputType="none"
                         android:minHeight="46dp"
@@ -221,7 +221,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:paddingStart="4dp"
-                android:text="Complaint Summary"
+                android:text="@string/complaints_summary"
                 android:textColor="#667085"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -242,7 +242,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="10dp"
-                    android:text="Total: 0"
+                    android:text="@string/summary_total_placeholder"
                     android:textColor="#0B4CC2"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -257,7 +257,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="10dp"
-                    android:text="Pending: 0"
+                    android:text="@string/summary_pending_placeholder"
                     android:textColor="#B42318"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -272,7 +272,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="10dp"
-                    android:text="In Progress: 0"
+                    android:text="@string/summary_progress_placeholder"
                     android:textColor="#C2410C"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -287,7 +287,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="10dp"
-                    android:text="Resolved: 0"
+                    android:text="@string/summary_resolved_placeholder"
                     android:textColor="#18794E"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -333,7 +333,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="Loading complaints..."
+                    android:text="@string/complaints_loading_title"
                     android:textColor="#243041"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -343,7 +343,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:gravity="center"
-                    android:text="Preparing filters and complaint list"
+                    android:text="@string/complaints_loading_body"
                     android:textColor="#6B7280"
                     android:textSize="12sp" />
             </LinearLayout>

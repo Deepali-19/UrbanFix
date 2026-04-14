@@ -18,7 +18,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@color/app_bar_color"
-            android:title="Urban Fix Dashboard"
+            android:title="@string/toolbar_dashboard"
             android:titleTextColor="@android:color/white"
             app:navigationIcon="@drawable/navi_drawer"/>
 

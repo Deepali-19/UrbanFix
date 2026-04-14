@@ -8,6 +8,7 @@ import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import com.example.urban.AppLocaleManager
 import com.example.urban.loginSingUp.LoginActivity
 import com.example.urban.loginSingUp.SessionManager
 import com.example.urban.bottomNavigation.DashboardActivity
@@ -20,6 +21,7 @@ class MainActivity : AppCompatActivity() {
         // 🌙 Restore dark/light mode BEFORE UI loads (IMPORTANT)
         val prefs = getSharedPreferences("theme", MODE_PRIVATE)
         val isDark = prefs.getBoolean("dark", false)
+        AppLocaleManager.applySavedLocale(this)
 
         if (isDark) {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
@@ -32,16 +34,16 @@ class MainActivity : AppCompatActivity() {
 
         val logo = findViewById<ImageView>(R.id.logo)
 
-        // 🎬 Splash animation
-        logo.scaleX = 0f
-        logo.scaleY = 0f
+        // A subtle scale-in works better for a full-screen splash artwork than the old logo pop.
+        logo.scaleX = 0.96f
+        logo.scaleY = 0.96f
         logo.alpha = 0f
 
         logo.animate()
             .scaleX(1f)
             .scaleY(1f)
             .alpha(1f)
-            .setDuration(900)
+            .setDuration(700)
             .setInterpolator(OvershootInterpolator())
             .start()
 
@@ -61,7 +63,10 @@ class MainActivity : AppCompatActivity() {
                 startActivity(Intent(this, LoginActivity::class.java).apply {
                     putExtra(SessionManager.EXTRA_SESSION_EXPIRED, user != null)
                     if (user != null) {
-                        putExtra(SessionManager.EXTRA_SESSION_MESSAGE, "Session expired. Please login again.")
+                        putExtra(
+                            SessionManager.EXTRA_SESSION_MESSAGE,
+                            getString(R.string.session_expired_login_again)
+                        )
                     }
                 })
             }

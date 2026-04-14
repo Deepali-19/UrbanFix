@@ -61,7 +61,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
-                        android:text="User Name"
+                        android:text="@string/profile_user_name_placeholder"
                         android:textColor="@android:color/white"
                         android:textSize="24sp"
                         android:textStyle="bold" />
@@ -71,7 +71,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="user@example.com"
+                        android:text="@string/profile_user_email_placeholder"
                         android:textColor="#E8F0FF"
                         android:textSize="14sp" />
 
@@ -91,7 +91,7 @@
                             android:paddingTop="6dp"
                             android:paddingEnd="12dp"
                             android:paddingBottom="6dp"
-                            android:text="Role"
+                            android:text="@string/profile_role_placeholder"
                             android:textColor="#0B4CC2"
                             android:textSize="12sp"
                             android:textStyle="bold" />
@@ -101,7 +101,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="10dp"
-                            android:text="Joined recently"
+                            android:text="@string/profile_joined_recently"
                             android:textColor="#E8F0FF"
                             android:textSize="12sp" />
                     </LinearLayout>
@@ -133,7 +133,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Account Overview"
+                            android:text="@string/profile_account_overview"
                             android:textColor="#111827"
                             android:textSize="16sp"
                             android:textStyle="bold" />
@@ -142,7 +142,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="Your official profile information for the admin system."
+                            android:text="@string/profile_account_overview_subtitle"
                             android:textColor="#667085"
                             android:textSize="12sp" />
 
@@ -155,7 +155,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Department"
+                                android:text="@string/filter_department"
                                 android:textColor="#98A2B3"
                                 android:textSize="12sp"
                                 android:textStyle="bold" />
@@ -165,7 +165,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
-                                android:text="Department"
+                                android:text="@string/filter_department"
                                 android:textColor="#111827"
                                 android:textSize="16sp"
                                 android:textStyle="bold" />
@@ -191,7 +191,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="City"
+                                    android:text="@string/profile_city"
                                     android:textColor="#98A2B3"
                                     android:textSize="12sp"
                                     android:textStyle="bold" />
@@ -201,7 +201,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="4dp"
-                                    android:text="City"
+                                    android:text="@string/profile_city"
                                     android:textColor="#111827"
                                     android:textSize="15sp"
                                     android:textStyle="bold" />
@@ -216,7 +216,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="Employee ID"
+                                    android:text="@string/signup_employee_id"
                                     android:textColor="#98A2B3"
                                     android:textSize="12sp"
                                     android:textStyle="bold" />
@@ -226,7 +226,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="4dp"
-                                    android:text="Employee ID"
+                                    android:text="@string/signup_employee_id"
                                     android:textColor="#111827"
                                     android:textSize="15sp"
                                     android:textStyle="bold" />
@@ -254,7 +254,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Identity Verification"
+                            android:text="@string/profile_identity_verification"
                             android:textColor="#111827"
                             android:textSize="16sp"
                             android:textStyle="bold" />
@@ -263,7 +263,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="Review the uploaded official ID tied to this staff account."
+                            android:text="@string/profile_identity_verification_subtitle"
                             android:textColor="#667085"
                             android:textSize="12sp" />
 
@@ -277,7 +277,7 @@
                             android:paddingTop="8dp"
                             android:paddingEnd="12dp"
                             android:paddingBottom="8dp"
-                            android:text="View Official ID"
+                            android:text="@string/profile_view_official_id"
                             android:textColor="#2457A7"
                             android:textSize="13sp"
                             android:textStyle="bold" />
@@ -303,7 +303,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Preferences"
+                            android:text="@string/profile_preferences"
                             android:textColor="#111827"
                             android:textSize="16sp"
                             android:textStyle="bold" />
@@ -323,7 +323,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="Appearance"
+                                    android:text="@string/profile_appearance"
                                     android:textColor="#98A2B3"
                                     android:textSize="12sp"
                                     android:textStyle="bold" />
@@ -333,7 +333,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="4dp"
-                                    android:text="Light Mode"
+                                    android:text="@string/theme_light"
                                     android:textColor="#111827"
                                     android:textSize="15sp"
                                     android:textStyle="bold" />
@@ -348,7 +348,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="Notifications"
+                                    android:text="@string/profile_notifications"
                                     android:textColor="#98A2B3"
                                     android:textSize="12sp"
                                     android:textStyle="bold" />
@@ -358,7 +358,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="4dp"
-                                    android:text="Enabled"
+                                    android:text="@string/notifications_enabled"
                                     android:textColor="#111827"
                                     android:textSize="15sp"
                                     android:textStyle="bold" />
@@ -386,7 +386,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="Language"
+                                    android:text="@string/profile_language"
                                     android:textColor="#98A2B3"
                                     android:textSize="12sp"
                                     android:textStyle="bold" />
@@ -396,7 +396,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="4dp"
-                                    android:text="English"
+                                    android:text="@string/language_option_english"
                                     android:textColor="#111827"
                                     android:textSize="15sp"
                                     android:textStyle="bold" />
@@ -413,7 +413,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginEnd="8dp"
-                                    android:text="Settings"
+                                    android:text="@string/profile_action_settings"
                                     android:textAllCaps="false" />
 
                                 <com.google.android.material.button.MaterialButton
@@ -421,7 +421,7 @@
                                     style="@style/Widget.Material3.Button.OutlinedButton"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="Help"
+                                    android:text="@string/profile_action_help"
                                     android:textAllCaps="false" />
                             </LinearLayout>
                         </LinearLayout>
@@ -435,7 +435,7 @@
                     android:layout_marginTop="18dp"
                     android:layout_marginBottom="24dp"
                     android:backgroundTint="#FF5C5C"
-                    android:text="Logout"
+                    android:text="@string/profile_logout"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
                     app:cornerRadius="18dp" />
@@ -480,7 +480,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="Loading profile..."
+                    android:text="@string/profile_loading_title"
                     android:textColor="#243041"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -490,7 +490,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:gravity="center"
-                    android:text="Fetching your account information"
+                    android:text="@string/profile_loading_body"
                     android:textColor="#6B7280"
                     android:textSize="12sp" />
             </LinearLayout>

@@ -31,10 +31,10 @@ class AlertAdapter(
 
     override fun onBindViewHolder(holder: AlertViewHolder, position: Int) {
         val alert = items[position]
-        holder.binding.tvAlertTitle.text = alert.title
-        holder.binding.tvAlertBody.text = alert.body
+        holder.binding.tvAlertTitle.text = localizedTitle(holder, alert)
+        holder.binding.tvAlertBody.text = localizedBody(holder, alert)
         holder.binding.tvAlertMeta.text = buildMeta(alert)
-        holder.binding.tvAlertType.text = alert.type
+        holder.binding.tvAlertType.text = localizedType(holder, alert)
         holder.binding.viewUnreadDot.visibility = if (alert.isRead) View.GONE else View.VISIBLE
 
         holder.binding.tvAlertType.setBackgroundResource(
@@ -62,6 +62,43 @@ class AlertAdapter(
             "${alert.complaintDisplayId} • $dateLabel"
         } else {
             dateLabel
+        }
+    }
+
+    private fun localizedType(holder: AlertViewHolder, alert: AlertItem): String {
+        val context = holder.binding.root.context
+        return when (alert.type) {
+            "Complaint Update" -> context.getString(R.string.alert_type_complaint_update)
+            "Assignment" -> context.getString(R.string.alert_type_assignment)
+            "Broadcast" -> context.getString(R.string.alert_type_broadcast)
+            "Resolved" -> context.getString(R.string.status_resolved)
+            else -> alert.type
+        }
+    }
+
+    private fun localizedTitle(holder: AlertViewHolder, alert: AlertItem): String {
+        val context = holder.binding.root.context
+        return when (alert.title) {
+            "Complaint settings saved" -> context.getString(R.string.alert_title_complaint_settings_saved)
+            "Officer assigned" -> context.getString(R.string.alert_title_officer_assigned)
+            "Broadcast sent" -> context.getString(R.string.alerts_broadcast_sent_title)
+            else -> alert.title
+        }
+    }
+
+    private fun localizedBody(holder: AlertViewHolder, alert: AlertItem): String {
+        val context = holder.binding.root.context
+        return when {
+            alert.body == "Something important settings were updated by admin. ETA was recalculated for the citizen." ->
+                context.getString(R.string.alert_body_settings_saved_eta)
+            alert.body.startsWith("A field officer was assigned to ") -> {
+                val complaintTitle = alert.body
+                    .removePrefix("A field officer was assigned to ")
+                    .removeSuffix(".")
+                context.getString(R.string.alert_body_officer_assigned, complaintTitle)
+            }
+            alert.title == "Broadcast sent" -> alert.body
+            else -> alert.body
         }
     }
 }

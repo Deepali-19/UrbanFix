@@ -2,6 +2,7 @@ package com.example.urban.bottomNavigation.home
 
 import com.example.urban.bottomNavigation.complaint.Complaint
 import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
+import com.example.urban.bottomNavigation.complaint.ComplaintEtaManager
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -9,7 +10,6 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.roundToInt
 
 enum class DashboardRange(val label: String) {
     ALL_TIME("All Data"),
@@ -364,25 +364,9 @@ object DashboardAnalytics {
     }
 
     private fun calculateSlaState(complaint: Complaint, zoneId: ZoneId): SlaState? {
-        if (complaint.status == 2 || complaint.timestamp <= 0L) return null
-
-        val department = ComplaintDataFormatter.resolvedDepartment(complaint)
-        val slaHours = when (department) {
-            "Sanitation" -> 24
-            "Water" -> 48
-            "Roads" -> 24 * 7
-            "Electricity" -> 48
-            else -> 72
-        }
-
-        val ageHours = kotlin.math.max(
-            0L,
-            (System.currentTimeMillis() - complaint.timestamp) / (1000 * 60 * 60)
-        )
-
         return when {
-            ageHours >= slaHours -> SlaState.OVERDUE
-            ageHours >= (slaHours * 0.8).roundToInt() -> SlaState.NEAR_BREACH
+            ComplaintEtaManager.isOverdue(complaint) -> SlaState.OVERDUE
+            ComplaintEtaManager.isNearBreach(complaint) -> SlaState.NEAR_BREACH
             else -> null
         }
     }

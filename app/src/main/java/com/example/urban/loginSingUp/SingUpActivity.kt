@@ -10,6 +10,8 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.example.urban.AppLocaleManager
+import com.example.urban.R
 import com.example.urban.BuildConfig
 import com.example.urban.databinding.ActivitySingUpBinding
 import com.google.firebase.auth.FirebaseAuth
@@ -41,6 +43,7 @@ class SingUpActivity : AppCompatActivity() {
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppLocaleManager.applySavedLocale(this)
         super.onCreate(savedInstanceState)
 
         binding = ActivitySingUpBinding.inflate(layoutInflater)
@@ -114,40 +117,40 @@ class SingUpActivity : AppCompatActivity() {
         val employeeId = binding.tilEmployeeId.editText!!.text.toString().trim()
 
         if (name.isEmpty() || email.isEmpty() || password.isEmpty() || confirm.isEmpty()) {
-            toast("Fill all required fields")
+            toast(getString(R.string.fill_required_fields))
             return
         }
 
         if (role.isEmpty()) {
-            toast("Select a role")
+            toast(getString(R.string.select_role))
             return
         }
 
         if (role != "Super Admin" && department.isEmpty()) {
-            toast("Select a department")
+            toast(getString(R.string.select_department))
             return
         }
 
         if (city.isEmpty() || employeeId.isEmpty()) {
-            toast("Add city and employee ID")
+            toast(getString(R.string.add_city_employee_id))
             return
         }
 
         if (!isValidPassword(password)) {
             binding.tilConfirmPassword.error =
-                "*Password must be 8+ characters with uppercase, lowercase, number and special character"
+                getString(R.string.password_rule_error)
             return
         }
 
         if (password != confirm) {
-            binding.tilConfirmPassword.error = "*Password doesn't match"
+            binding.tilConfirmPassword.error = getString(R.string.password_mismatch)
             return
         } else {
             binding.tilConfirmPassword.error = null
         }
 
         if (uploadedImageUrl.isEmpty()) {
-            toast("Upload official ID proof first")
+            toast(getString(R.string.upload_id_proof_first))
             return
         }
 
@@ -178,13 +181,13 @@ class SingUpActivity : AppCompatActivity() {
 
                 auth.signOut()
                 SessionManager.clear(this)
-                toast("Account created successfully")
+                toast(getString(R.string.account_created_successfully))
 
                 startActivity(Intent(this, LoginActivity::class.java))
                 finish()
             }
             .addOnFailureListener {
-                toast(it.message ?: "Signup failed")
+                toast(it.message ?: getString(R.string.signup_failed))
             }
     }
 

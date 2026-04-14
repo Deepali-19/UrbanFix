@@ -9,7 +9,7 @@
         android:id="@+id/tvHelpTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Profile Help"
+        android:text="@string/profile_help_title"
         android:textColor="#111827"
         android:textSize="20sp"
         android:textStyle="bold" />
@@ -62,7 +62,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="end"
         android:layout_marginTop="18dp"
-        android:text="Close"
+        android:text="@string/common_close"
         android:textAllCaps="false" />
 
 </LinearLayout>

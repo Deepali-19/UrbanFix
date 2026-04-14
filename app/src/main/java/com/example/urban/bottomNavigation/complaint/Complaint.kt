@@ -20,6 +20,11 @@ data class Complaint(
     val updatedAt: Long = 0L,
     val resolvedAt: Long = 0L,
     val priority: Int = 0, // 0 = Low, 1 = Medium, 2 = High
+    val etaHours: Int = 0,
+    val estimatedResolutionAt: Long = 0L,
+    val etaUpdatedAt: Long = 0L,
+    val etaReason: String = "",
+    val etaNotificationSentAt: Long = 0L,
     val validation: Boolean = false,
     val readByAdmin: Boolean = false,
     val departmentId: String = "",

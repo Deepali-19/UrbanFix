@@ -18,8 +18,6 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
 import com.example.urban.R
-import com.example.urban.bottomNavigation.alert.AlertItem
-import com.example.urban.bottomNavigation.alert.AlertStorage
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -30,7 +28,6 @@ import com.google.firebase.database.ValueEventListener
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
 
 class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
 
@@ -46,8 +43,12 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
     private lateinit var tvIssueType: TextView
     private lateinit var tvDepartment: TextView
     private lateinit var tvDate: TextView
+    private lateinit var tvEtaValue: TextView
+    private lateinit var tvEtaReasonValue: TextView
+    private lateinit var tvEtaNotifyStatus: TextView
     private lateinit var tvLocation: TextView
     private lateinit var tvCoordinates: TextView
+    private lateinit var tvCitizenNameValue: TextView
     private lateinit var tvPhoneValue: TextView
     private lateinit var tvAssignedOfficerValue: TextView
     private lateinit var tvValidationValue: TextView
@@ -55,6 +56,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
     private lateinit var imgComplaint: ImageView
     private lateinit var btnOpenMap: Button
     private lateinit var btnPreviewImage: Button
+    private lateinit var btnNotifyEta: Button
 
     private lateinit var assignSection: View
     private lateinit var statusSection: View
@@ -90,8 +92,12 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         tvIssueType = view.findViewById(R.id.tvIssueType)
         tvDepartment = view.findViewById(R.id.tvDepartment)
         tvDate = view.findViewById(R.id.tvDate)
+        tvEtaValue = view.findViewById(R.id.tvEtaValue)
+        tvEtaReasonValue = view.findViewById(R.id.tvEtaReasonValue)
+        tvEtaNotifyStatus = view.findViewById(R.id.tvEtaNotifyStatus)
         tvLocation = view.findViewById(R.id.tvLocation)
         tvCoordinates = view.findViewById(R.id.tvCoordinates)
+        tvCitizenNameValue = view.findViewById(R.id.tvCitizenNameValue)
         tvPhoneValue = view.findViewById(R.id.tvPhoneValue)
         tvAssignedOfficerValue = view.findViewById(R.id.tvAssignedOfficerValue)
         tvValidationValue = view.findViewById(R.id.tvValidationValue)
@@ -99,6 +105,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         imgComplaint = view.findViewById(R.id.imgComplaint)
         btnOpenMap = view.findViewById(R.id.btnOpenMap)
         btnPreviewImage = view.findViewById(R.id.btnPreviewImage)
+        btnNotifyEta = view.findViewById(R.id.btnNotifyEta)
 
         assignSection = view.findViewById(R.id.assignSection)
         statusSection = view.findViewById(R.id.statusSection)
@@ -120,6 +127,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         btnOpenMap.setOnClickListener { openLocationInMaps() }
         btnPreviewImage.setOnClickListener { previewComplaintImage() }
         imgComplaint.setOnClickListener { previewComplaintImage() }
+        btnNotifyEta.setOnClickListener { notifyEtaToCivilian() }
 
         loadComplaint()
         loadUserRole()
@@ -188,6 +196,9 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         tvDescription.text = complaint.description.ifBlank { "No description provided" }
         tvIssueType.text = complaint.issueType.ifBlank { "Not specified" }
         tvDepartment.text = ComplaintDataFormatter.resolvedDepartment(complaint)
+        tvEtaValue.text = ComplaintEtaManager.etaDisplayLabel(complaint)
+        tvEtaReasonValue.text = ComplaintEtaManager.etaReasonLabel(complaint)
+        tvEtaNotifyStatus.text = etaNotifyStatusLabel(complaint)
         tvLocation.text = ComplaintDataFormatter.locationLabel(complaint)
         tvCoordinates.text = ComplaintDataFormatter.coordinatesLabel(complaint)
         tvDate.text = if (complaint.timestamp > 0L) {
@@ -198,6 +209,11 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
         tvPhoneValue.text = if (complaint.phone > 0L) {
             complaint.phone.toString()
+        } else {
+            "Not available"
+        }
+        tvCitizenNameValue.text = if (complaint.civilianId.isNotBlank()) {
+            "Loading citizen details..."
         } else {
             "Not available"
         }
@@ -247,11 +263,12 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             loadAssignedOfficerName(complaint.allottedOfficerId)
         }
 
-        if (complaint.phone <= 0L && complaint.civilianId.isNotBlank()) {
-            loadCivilianPhone(complaint.civilianId)
+        if (complaint.civilianId.isNotBlank()) {
+            loadCivilianDetails(complaint.civilianId)
         }
 
         preselectAssignedOfficer(complaint.allottedOfficerId)
+        updateEtaActionVisibility()
     }
 
     private fun hydrateComplaint(snapshot: DataSnapshot, complaint: Complaint): Complaint {
@@ -263,12 +280,20 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             ?: 0L
         val latitude = complaint.latitude.takeIf { it != 0.0 }
             ?: snapshot.readDouble("latitude", "lat")
+            ?: snapshot.readNestedDouble("location", "latitude")
+            ?: snapshot.readNestedDouble("coordinates", "latitude")
+            ?: snapshot.readNestedDouble("latLng", "latitude")
             ?: 0.0
         val longitude = complaint.longitude.takeIf { it != 0.0 }
             ?: snapshot.readDouble("longitude", "lng", "lon")
+            ?: snapshot.readNestedDouble("location", "longitude")
+            ?: snapshot.readNestedDouble("coordinates", "longitude")
+            ?: snapshot.readNestedDouble("latLng", "longitude")
             ?: 0.0
         val location = complaint.location.takeIf { it.isNotBlank() }
             ?: snapshot.readString("location", "address", "selectedLocation")
+            ?: snapshot.readNestedString("location", "address")
+            ?: snapshot.readNestedString("location", "name")
             ?: ""
 
         return complaint.copy(
@@ -298,17 +323,32 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         )
     }
 
-    private fun loadCivilianPhone(civilianId: String) {
+    private fun loadCivilianDetails(civilianId: String) {
         database.child("Users").child(civilianId)
             .get()
             .addOnSuccessListener { snapshot ->
-                val fallbackPhone = snapshot.readLong("phone", "mobile", "contact", "citizenPhone") ?: return@addOnSuccessListener
-                if (fallbackPhone <= 0L) return@addOnSuccessListener
+                val fallbackName = snapshot.readString("name", "username", "fullName", "displayName")
+                val fallbackPhone = snapshot.readLong("phone", "mobile", "contact", "citizenPhone")
 
-                currentComplaint = currentComplaint?.copy(phone = fallbackPhone)?.also {
-                    it.firebaseKey = complaintKey.orEmpty()
+                if (!fallbackName.isNullOrBlank()) {
+                    tvCitizenNameValue.text = fallbackName
                 }
-                tvPhoneValue.text = fallbackPhone.toString()
+
+                if (fallbackPhone != null && fallbackPhone > 0L) {
+                    currentComplaint = currentComplaint?.copy(phone = fallbackPhone)?.also {
+                        it.firebaseKey = complaintKey.orEmpty()
+                    }
+                    tvPhoneValue.text = fallbackPhone.toString()
+                }
+
+                if (fallbackName.isNullOrBlank() && (fallbackPhone == null || fallbackPhone <= 0L)) {
+                    tvCitizenNameValue.text = "Not available"
+                } else if (fallbackName.isNullOrBlank()) {
+                    tvCitizenNameValue.text = "Not available"
+                }
+            }
+            .addOnFailureListener {
+                tvCitizenNameValue.text = "Not available"
             }
     }
 
@@ -357,32 +397,26 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .child(key)
             .updateChildren(update)
             .addOnSuccessListener {
-                saveLocalAlert(
-                    title = when (status) {
-                        2 -> "Complaint resolved"
-                        1 -> "Complaint in progress"
-                        else -> "Complaint updated"
-                    },
-                    body = buildString {
-                        append(complaint.title.ifBlank { "Complaint" })
-                        append(" was updated by the field officer.")
-                        if (remark.isNotBlank()) {
-                            append(" Remark: ")
-                            append(remark)
-                        }
-                    },
-                    type = when (status) {
-                        2 -> "Resolved"
-                        else -> "Complaint Update"
-                    },
-                    complaint = complaint,
-                    complaintKey = key
-                )
-                Toast.makeText(requireContext(), "Complaint updated", Toast.LENGTH_SHORT).show()
-                if (status == 2) {
-                    sendSMS(complaint.phone, complaint.complaintId.ifBlank { key })
+                val updatedComplaint = complaint.copy(
+                    status = status,
+                    feedback = remark,
+                    readByAdmin = false,
+                    updatedAt = now,
+                    resolvedAt = if (status == 2) now else 0L
+                ).also {
+                    it.firebaseKey = complaint.firebaseKey
                 }
-                loadComplaint()
+
+                refreshEtaForComplaint(
+                    complaintKey = key,
+                    baseComplaint = updatedComplaint
+                ) { _, _ ->
+                    Toast.makeText(requireContext(), "Complaint updated", Toast.LENGTH_SHORT).show()
+                    if (status == 2) {
+                        sendSMS(complaint.phone, complaint.complaintId.ifBlank { key })
+                    }
+                    loadComplaint()
+                }
             }
             .addOnFailureListener { error ->
                 Toast.makeText(requireContext(), error.message ?: "Update failed", Toast.LENGTH_SHORT).show()
@@ -431,25 +465,29 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .child(key)
             .updateChildren(updates)
             .addOnSuccessListener {
-                val alertType = if (updates.containsKey("allottedOfficerId")) {
-                    "Assignment"
-                } else {
-                    "Complaint Update"
+                val updatedComplaint = complaint.copy(
+                    priority = updates["priority"] as? Int ?: complaint.priority,
+                    validation = updates["validation"] as? Boolean ?: complaint.validation,
+                    allottedOfficerId = updates["allottedOfficerId"] as? String ?: complaint.allottedOfficerId,
+                    departmentId = updates["departmentId"] as? String ?: complaint.departmentId,
+                    readByAdmin = true,
+                    updatedAt = now
+                ).also {
+                    it.firebaseKey = complaint.firebaseKey
                 }
-                val alertBody = if (updates.containsKey("allottedOfficerId")) {
-                    "A field officer was assigned to ${complaint.title.ifBlank { "this complaint" }}."
-                } else {
-                    "${complaint.title.ifBlank { "Complaint" }} settings were updated by admin."
+
+                refreshEtaForComplaint(
+                    complaintKey = key,
+                    baseComplaint = updatedComplaint
+                ) { _, etaChanged ->
+                    val message = if (etaChanged) {
+                        "Complaint settings saved and ETA updated"
+                    } else {
+                        "Complaint settings saved"
+                    }
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+                    loadComplaint()
                 }
-                saveLocalAlert(
-                    title = if (alertType == "Assignment") "Officer assigned" else "Complaint settings saved",
-                    body = alertBody,
-                    type = alertType,
-                    complaint = complaint,
-                    complaintKey = key
-                )
-                Toast.makeText(requireContext(), "Complaint settings saved", Toast.LENGTH_SHORT).show()
-                loadComplaint()
             }
             .addOnFailureListener { error ->
                 Toast.makeText(requireContext(), error.message ?: "Save failed", Toast.LENGTH_SHORT).show()
@@ -503,6 +541,51 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         if (phone <= 0L) return
 
         val message = "Your complaint ($complaintId) has been resolved."
+        openSmsComposer(phone, message)
+    }
+
+    private fun notifyEtaToCivilian() {
+        val complaint = currentComplaint ?: return
+        val key = complaintKey ?: return
+        if (complaint.civilianId.isBlank()) {
+            Toast.makeText(requireContext(), "Civilian account is not linked to this complaint", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val payload = hashMapOf<String, Any>(
+            "title" to "Complaint ETA Updated",
+            "body" to ComplaintEtaManager.civilianEtaMessage(complaint, key),
+            "complaintId" to complaint.complaintId.ifBlank { key },
+            "complaintKey" to key,
+            "civilianId" to complaint.civilianId,
+            "type" to "ETA Update",
+            "estimatedResolutionAt" to complaint.estimatedResolutionAt,
+            "etaHours" to complaint.etaHours,
+            "timestamp" to now
+        )
+
+        database.child("CivilianMessages")
+            .push()
+            .setValue(payload)
+            .addOnSuccessListener {
+                database.child("Complaints")
+                    .child(key)
+                    .child("etaNotificationSentAt")
+                    .setValue(now)
+
+                currentComplaint = complaint.copy(etaNotificationSentAt = now).also {
+                    it.firebaseKey = complaint.firebaseKey
+                }
+                tvEtaNotifyStatus.text = etaNotifyStatusLabel(currentComplaint ?: complaint)
+                Toast.makeText(requireContext(), "ETA notification sent to civilian app", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { error ->
+                Toast.makeText(requireContext(), error.message ?: "Failed to notify civilian", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun openSmsComposer(phone: Long, message: String) {
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("smsto:$phone")
             putExtra("sms_body", message)
@@ -511,28 +594,6 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         if (intent.resolveActivity(requireContext().packageManager) != null) {
             startActivity(intent)
         }
-    }
-
-    // Local alerts keep the Alerts tab useful during app-side testing even before external FCM senders are connected.
-    private fun saveLocalAlert(
-        title: String,
-        body: String,
-        type: String,
-        complaint: Complaint,
-        complaintKey: String
-    ) {
-        AlertStorage.addAlert(
-            requireContext(),
-            AlertItem(
-                id = UUID.randomUUID().toString(),
-                title = title,
-                body = body,
-                type = type,
-                timestamp = System.currentTimeMillis(),
-                complaintKey = complaintKey,
-                complaintDisplayId = complaint.complaintId.ifBlank { complaintKey }
-            )
-        )
     }
 
     private fun loadUserRole() {
@@ -574,6 +635,8 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                 loadOfficers()
             }
         }
+
+        updateEtaActionVisibility()
     }
 
     private fun loadOfficers() {
@@ -721,6 +784,99 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    private fun refreshEtaForComplaint(
+        complaintKey: String,
+        baseComplaint: Complaint,
+        onComplete: (Complaint, Boolean) -> Unit
+    ) {
+        database.child("Complaints")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val openDepartmentLoad = snapshot.children
+                    .mapNotNull { item ->
+                        item.getValue(Complaint::class.java)?.apply {
+                            firebaseKey = item.key.orEmpty()
+                        }
+                    }
+                    .count {
+                        it.status != 2 &&
+                            ComplaintDataFormatter.resolvedDepartment(it) == ComplaintDataFormatter.resolvedDepartment(baseComplaint)
+                    }
+                    .coerceAtLeast(if (baseComplaint.status != 2) 1 else 0)
+
+                val etaPayload = ComplaintEtaManager.calculateEta(baseComplaint, openDepartmentLoad)
+                if (etaPayload == null) {
+                    onComplete(baseComplaint, false)
+                    return@addOnSuccessListener
+                }
+
+                val refreshedComplaint = baseComplaint.copy(
+                    etaHours = etaPayload.etaHours,
+                    estimatedResolutionAt = etaPayload.estimatedResolutionAt,
+                    etaUpdatedAt = etaPayload.etaUpdatedAt,
+                    etaReason = etaPayload.etaReason
+                ).also {
+                    it.firebaseKey = baseComplaint.firebaseKey
+                }
+
+                if (!ComplaintEtaManager.shouldPersist(baseComplaint, etaPayload)) {
+                        currentComplaint = refreshedComplaint
+                        tvEtaValue.text = ComplaintEtaManager.etaDisplayLabel(refreshedComplaint)
+                        tvEtaReasonValue.text = ComplaintEtaManager.etaReasonLabel(refreshedComplaint)
+                        tvEtaNotifyStatus.text = etaNotifyStatusLabel(refreshedComplaint)
+                        updateEtaActionVisibility()
+                        onComplete(refreshedComplaint, false)
+                        return@addOnSuccessListener
+                }
+
+                database.child("Complaints")
+                    .child(complaintKey)
+                    .updateChildren(
+                        mapOf(
+                            "etaHours" to etaPayload.etaHours,
+                            "estimatedResolutionAt" to etaPayload.estimatedResolutionAt,
+                            "etaUpdatedAt" to etaPayload.etaUpdatedAt,
+                            "etaReason" to etaPayload.etaReason
+                        )
+                    )
+                    .addOnSuccessListener {
+                        currentComplaint = refreshedComplaint
+                        tvEtaValue.text = ComplaintEtaManager.etaDisplayLabel(refreshedComplaint)
+                        tvEtaReasonValue.text = ComplaintEtaManager.etaReasonLabel(refreshedComplaint)
+                        tvEtaNotifyStatus.text = etaNotifyStatusLabel(refreshedComplaint)
+                        updateEtaActionVisibility()
+                        onComplete(refreshedComplaint, true)
+                    }
+                    .addOnFailureListener {
+                        onComplete(baseComplaint, false)
+                    }
+            }
+            .addOnFailureListener {
+                onComplete(baseComplaint, false)
+            }
+    }
+
+    private fun updateEtaActionVisibility() {
+        val complaint = currentComplaint
+        val canSendEta = complaint != null &&
+            complaint.status != 2 &&
+            complaint.civilianId.isNotBlank() &&
+            userRole != "Field Officer"
+
+        btnNotifyEta.visibility = if (canSendEta) View.VISIBLE else View.GONE
+    }
+
+    private fun etaNotifyStatusLabel(complaint: Complaint): String {
+        if (complaint.etaNotificationSentAt <= 0L) {
+            return "Not sent yet"
+        }
+
+        return "Sent on ${
+            SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+                .format(Date(complaint.etaNotificationSentAt))
+        }"
+    }
+
     private fun DataSnapshot.readString(vararg keys: String): String? {
         for (key in keys) {
             val value = child(key).value?.toString()?.trim().orEmpty()
@@ -763,6 +919,27 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             }
         }
         return null
+    }
+
+    private fun DataSnapshot.readNestedString(parentKey: String, childKey: String): String? {
+        val parent = child(parentKey)
+        if (!parent.exists()) return null
+        val value = parent.child(childKey).value?.toString()?.trim().orEmpty()
+        return value.takeIf { it.isNotBlank() && it.lowercase(Locale.getDefault()) != "null" }
+    }
+
+    private fun DataSnapshot.readNestedDouble(parentKey: String, childKey: String): Double? {
+        val parent = child(parentKey)
+        if (!parent.exists()) return null
+        val rawValue = parent.child(childKey).value ?: return null
+        val parsed = when (rawValue) {
+            is Double -> rawValue
+            is Long -> rawValue.toDouble()
+            is Int -> rawValue.toDouble()
+            is String -> rawValue.trim().toDoubleOrNull()
+            else -> null
+        }
+        return parsed?.takeIf { it != 0.0 }
     }
 
     companion object {

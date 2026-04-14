@@ -24,7 +24,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Alert Center"
+                android:text="@string/alerts_center"
                 android:textColor="#111827"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -34,7 +34,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="FCM alerts, complaint updates, and operational notifications."
+                android:text="@string/alerts_subtitle_default"
                 android:textColor="#667085"
                 android:textSize="12sp" />
 
@@ -43,7 +43,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Broadcast is available for admin users."
+                android:text="@string/alerts_broadcast_admin_only"
                 android:textColor="#0B4CC2"
                 android:textSize="12sp"
                 android:textStyle="bold"
@@ -65,7 +65,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="10dp"
-                    android:text="Total: 0"
+                    android:text="@string/summary_total_placeholder"
                     android:textColor="#0B4CC2"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -80,7 +80,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="10dp"
-                    android:text="Unread: 0"
+                    android:text="@string/alerts_unread_placeholder"
                     android:textColor="#B42318"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -95,7 +95,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="10dp"
-                    android:text="Read: 0"
+                    android:text="@string/alerts_read_placeholder"
                     android:textColor="#18794E"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -113,7 +113,7 @@
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Mark All Read"
+                    android:text="@string/alerts_mark_all_read"
                     android:textAllCaps="false" />
 
                 <com.google.android.material.button.MaterialButton
@@ -122,7 +122,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:text="Clear"
+                    android:text="@string/alerts_clear"
                     android:textAllCaps="false" />
             </LinearLayout>
         </LinearLayout>
@@ -157,7 +157,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
-                android:text="No alerts yet"
+                android:text="@string/alerts_empty_title"
                 android:textColor="#111827"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -167,7 +167,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:gravity="center"
-                android:text="New complaint alerts, assignment updates, and FCM notifications will appear here."
+                android:text="@string/alerts_empty_body"
                 android:textColor="#667085"
                 android:textSize="13sp" />
         </LinearLayout>
@@ -210,7 +210,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="Loading alerts..."
+                    android:text="@string/alerts_loading_title"
                     android:textColor="#243041"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -225,7 +225,7 @@
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="20dp"
         android:layout_marginBottom="24dp"
-        android:contentDescription="Broadcast to civilians"
+        android:contentDescription="@string/alerts_broadcast_fab_description"
         android:src="@drawable/notify"
         android:visibility="gone"
         app:backgroundTint="#0B4CC2"

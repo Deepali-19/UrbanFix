@@ -1,5 +1,8 @@
 package com.example.urban.bottomNavigation.complaint
 
+import android.content.Context
+import com.example.urban.R
+
 object ComplaintDataFormatter {
 
     fun hasCoordinates(complaint: Complaint): Boolean {
@@ -20,6 +23,23 @@ object ComplaintDataFormatter {
             String.format("%.5f, %.5f", complaint.latitude, complaint.longitude)
         } else {
             "Coordinates not available"
+        }
+    }
+
+    fun localizedLocationLabel(context: Context, complaint: Complaint): String {
+        val location = complaint.location.trim()
+        return when {
+            location.isNotBlank() -> location
+            hasCoordinates(complaint) -> context.getString(R.string.complaint_coordinates_available)
+            else -> context.getString(R.string.complaint_location_not_available)
+        }
+    }
+
+    fun localizedCoordinatesLabel(context: Context, complaint: Complaint): String {
+        return if (hasCoordinates(complaint)) {
+            String.format("%.5f, %.5f", complaint.latitude, complaint.longitude)
+        } else {
+            context.getString(R.string.complaint_coordinates_not_available)
         }
     }
 
@@ -45,6 +65,18 @@ object ComplaintDataFormatter {
             "sanitation", "sanitisation" -> "Sanitation"
             "electricity", "electric" -> "Electricity"
             else -> value.trim().takeIf { it.isNotBlank() }
+        }
+    }
+
+    fun localizedDepartmentName(context: Context, value: String): String {
+        return when (normalizeDepartment(value).orEmpty()) {
+            "Water" -> context.getString(R.string.department_water)
+            "Roads" -> context.getString(R.string.department_roads)
+            "Sanitation" -> context.getString(R.string.department_sanitation)
+            "Electricity" -> context.getString(R.string.department_electricity)
+            "General" -> context.getString(R.string.department_general)
+            "All Departments" -> context.getString(R.string.department_all)
+            else -> value.ifBlank { context.getString(R.string.department_general) }
         }
     }
 }

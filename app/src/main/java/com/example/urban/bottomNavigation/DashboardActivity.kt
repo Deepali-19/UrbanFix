@@ -4,8 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.widget.Toast
 import android.widget.ImageView
 import android.widget.TextView
@@ -19,11 +17,14 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.core.view.GravityCompat
 import com.bumptech.glide.Glide
+import com.example.urban.AppLocaleManager
 import com.example.urban.R
 import com.example.urban.bottomNavigation.alert.AlertsFragment
 import com.example.urban.bottomNavigation.alert.AlertNotifier
 import com.example.urban.bottomNavigation.alert.AlertItem
 import com.example.urban.bottomNavigation.alert.AlertStorage
+import com.example.urban.bottomNavigation.complaint.Complaint
+import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
 import com.example.urban.bottomNavigation.complaint.ComplaintFragment
 import com.example.urban.bottomNavigation.drawer.FO.FieldOfficerFragment
 import com.example.urban.bottomNavigation.home.HomeFragment
@@ -59,22 +60,22 @@ class DashboardActivity : AppCompatActivity() {
     private var openAlertsFromIntent = false
     private var adminMessageListener: ChildEventListener? = null
     private var adminMessageRef: DatabaseReference? = null
+    private var complaintListener: ChildEventListener? = null
+    private var complaintRef: DatabaseReference? = null
     private val knownAdminMessageKeys = mutableSetOf<String>()
-    private val sessionHandler = Handler(Looper.getMainLooper())
-    private val sessionTimeoutRunnable = Runnable {
-        if (SessionManager.isExpired(this)) {
-            redirectToLogin(sessionExpired = true)
-        } else {
-            scheduleSessionTimeout()
-        }
-    }
+    private val knownComplaintKeys = mutableSetOf<String>()
+    private val knownComplaintAssignments = mutableMapOf<String, String>()
+    private val liveAlertComplaintKeys = mutableSetOf<String>()
 
     private val auth = FirebaseAuth.getInstance()
     private val database = FirebaseDatabase.getInstance().reference
+    private var currentUserRole = "Department Admin"
+    private var currentUserDepartment = ""
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppLocaleManager.applySavedLocale(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_dashboard)
         isFreshLaunch = savedInstanceState == null
@@ -174,12 +175,12 @@ class DashboardActivity : AppCompatActivity() {
 
         //  Title change
         when (fragment) {
-            is HomeFragment -> toolbar.title = "Dashboard"
-            is ProfileFragment -> toolbar.title = "Your Profile"
-            is ComplaintFragment -> toolbar.title = "Complaints"
-            is AlertsFragment -> toolbar.title = "Notifications"
-            is MapFragment -> toolbar.title = "Map"
-            is FieldOfficerFragment -> toolbar.title = "Field Officers"
+            is HomeFragment -> toolbar.title = getString(R.string.toolbar_dashboard)
+            is ProfileFragment -> toolbar.title = getString(R.string.toolbar_profile)
+            is ComplaintFragment -> toolbar.title = getString(R.string.toolbar_complaints)
+            is AlertsFragment -> toolbar.title = getString(R.string.toolbar_notifications)
+            is MapFragment -> toolbar.title = getString(R.string.toolbar_map)
+            is FieldOfficerFragment -> toolbar.title = getString(R.string.toolbar_field_officers)
         }
 
         //  Refresh menu
@@ -234,6 +235,10 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
             .get()
             .addOnSuccessListener {
                 val role = resolveRole(it.child("role").value?.toString())
+                val department = it.child("department").value?.toString().orEmpty()
+                currentUserRole = role
+                currentUserDepartment = ComplaintDataFormatter.normalizeDepartment(department)
+                    ?: department.trim()
                 setupBottomNav(role)
             }
             .addOnFailureListener {
@@ -257,8 +262,10 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
 
         if (role == "Field Officer") {
             stopAdminMessageListener()
+            startComplaintListener()
         } else {
             startAdminMessageListener()
+            startComplaintListener()
         }
     }
 
@@ -335,14 +342,10 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
                 if (messageKey.isNotBlank() && !knownAdminMessageKeys.add(messageKey)) return
 
                 val alert = buildAdminMessageAlert(snapshot)
+                val eventKey = "new_report:${alert.complaintKey.ifBlank { messageKey }}"
+                if (!shouldDispatchLiveAlert(eventKey)) return
 
-                AlertStorage.addAlert(this@DashboardActivity, alert)
-                AlertNotifier.show(this@DashboardActivity, alert)
-                Toast.makeText(
-                    this@DashboardActivity,
-                    "NEW REPORT: ${alert.title}\nID: ${alert.complaintDisplayId.ifBlank { "N/A" }}",
-                    Toast.LENGTH_LONG
-                ).show()
+                dispatchAlert(alert)
             }
 
             override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) = Unit
@@ -380,6 +383,183 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         )
     }
 
+    // Fall back to the Complaints node so admins still get a live alert even if AdminMessages is not written.
+    private fun startComplaintListener() {
+        if (complaintRef != null) return
+
+        val ref = FirebaseDatabase.getInstance().getReference("Complaints")
+        complaintRef = ref
+
+        ref.get()
+            .addOnSuccessListener { snapshot ->
+                knownComplaintKeys.clear()
+                snapshot.children.mapNotNullTo(knownComplaintKeys) { it.key }
+                knownComplaintAssignments.clear()
+                snapshot.children.forEach { child ->
+                    val complaintKey = child.key.orEmpty()
+                    if (complaintKey.isBlank()) return@forEach
+                    val assignedOfficerId = child.child("allottedOfficerId").value?.toString().orEmpty()
+                    knownComplaintAssignments[complaintKey] = assignedOfficerId
+                }
+                attachComplaintListener(ref)
+            }
+            .addOnFailureListener {
+                knownComplaintKeys.clear()
+                knownComplaintAssignments.clear()
+                attachComplaintListener(ref)
+            }
+    }
+
+    private fun attachComplaintListener(ref: DatabaseReference) {
+        if (complaintListener != null) return
+
+        complaintListener = object : ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                val complaintKey = snapshot.key.orEmpty()
+                if (complaintKey.isNotBlank() && !knownComplaintKeys.add(complaintKey)) return
+
+                val complaint = snapshot.getValue(Complaint::class.java)?.apply {
+                    firebaseKey = complaintKey
+                } ?: return
+
+                knownComplaintAssignments[complaintKey] = complaint.allottedOfficerId.trim()
+
+                when (currentUserRole) {
+                    "Super Admin", "Department Admin" -> {
+                        if (!shouldNotifyForComplaint(complaint)) return
+
+                        val alert = buildComplaintAlert(snapshot, complaint)
+                        val eventKey = "new_report:${alert.complaintKey.ifBlank { complaintKey }}"
+                        if (!shouldDispatchLiveAlert(eventKey)) return
+
+                        dispatchAlert(alert)
+                    }
+
+                    "Field Officer" -> {
+                        val currentUserId = auth.currentUser?.uid.orEmpty()
+                        if (currentUserId.isBlank()) return
+                        if (!complaint.allottedOfficerId.trim().equals(currentUserId, ignoreCase = false)) return
+
+                        val alert = buildAssignmentAlert(snapshot, complaint)
+                        val eventKey = "assignment:${alert.complaintKey.ifBlank { complaintKey }}"
+                        if (!shouldDispatchLiveAlert(eventKey)) return
+
+                        dispatchAlert(alert)
+                    }
+                }
+            }
+
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
+                if (currentUserRole != "Field Officer") return
+
+                val complaintKey = snapshot.key.orEmpty()
+                if (complaintKey.isBlank()) return
+
+                val complaint = snapshot.getValue(Complaint::class.java)?.apply {
+                    firebaseKey = complaintKey
+                } ?: return
+
+                val previousOfficerId = knownComplaintAssignments[complaintKey].orEmpty()
+                val currentOfficerId = complaint.allottedOfficerId.trim()
+                knownComplaintAssignments[complaintKey] = currentOfficerId
+
+                val currentUserId = auth.currentUser?.uid.orEmpty()
+                if (currentUserId.isBlank()) return
+
+                val wasAssignedToCurrentUser = previousOfficerId == currentUserId
+                val isAssignedToCurrentUser = currentOfficerId == currentUserId
+
+                if (wasAssignedToCurrentUser || !isAssignedToCurrentUser) return
+
+                val alert = buildAssignmentAlert(snapshot, complaint)
+                val eventKey = "assignment:${alert.complaintKey.ifBlank { complaintKey }}"
+                if (!shouldDispatchLiveAlert(eventKey)) return
+
+                dispatchAlert(alert)
+            }
+
+            override fun onChildRemoved(snapshot: DataSnapshot) = Unit
+
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) = Unit
+
+            override fun onCancelled(error: DatabaseError) = Unit
+        }
+
+        ref.addChildEventListener(complaintListener as ChildEventListener)
+    }
+
+    private fun buildComplaintAlert(snapshot: DataSnapshot, complaint: Complaint): AlertItem {
+        val complaintKey = snapshot.key.orEmpty()
+        val complaintDisplayId = complaint.complaintId.ifBlank { complaintKey }
+        val department = ComplaintDataFormatter.resolvedDepartment(complaint)
+        val location = complaint.location.trim().ifBlank { "selected area" }
+        val issueType = complaint.issueType.trim().ifBlank { "General issue" }
+        val eventTimestamp = complaint.timestamp
+            .takeIf { it > 0L }
+            ?: snapshot.child("timestamp").getValue(Long::class.java)
+            ?: snapshot.child("timeStamp").getValue(Long::class.java)
+            ?: System.currentTimeMillis()
+
+        return AlertItem(
+            id = complaintKey.ifBlank { snapshot.key ?: UUID.randomUUID().toString() },
+            title = "New Complaint Reported",
+            body = "$issueType reported from $location • $department",
+            type = "New Report",
+            timestamp = eventTimestamp,
+            complaintKey = complaintKey,
+            complaintDisplayId = complaintDisplayId
+        )
+    }
+
+    private fun buildAssignmentAlert(snapshot: DataSnapshot, complaint: Complaint): AlertItem {
+        val complaintKey = snapshot.key.orEmpty()
+        val complaintDisplayId = complaint.complaintId.ifBlank { complaintKey }
+        val issueType = complaint.issueType.trim().ifBlank { "General issue" }
+        val location = complaint.location.trim().ifBlank { "selected area" }
+        val eventTimestamp = complaint.updatedAt
+            .takeIf { it > 0L }
+            ?: complaint.timestamp.takeIf { it > 0L }
+            ?: snapshot.child("updatedAt").getValue(Long::class.java)
+            ?: snapshot.child("timestamp").getValue(Long::class.java)
+            ?: System.currentTimeMillis()
+
+        return AlertItem(
+            id = "assignment_$complaintKey",
+            title = "Complaint Assigned",
+            body = "$issueType at $location is now assigned to you.",
+            type = "Assignment",
+            timestamp = eventTimestamp,
+            complaintKey = complaintKey,
+            complaintDisplayId = complaintDisplayId
+        )
+    }
+
+    private fun shouldNotifyForComplaint(complaint: Complaint): Boolean {
+        return when (currentUserRole) {
+            "Super Admin" -> true
+            "Department Admin" -> {
+                val complaintDepartment = ComplaintDataFormatter.resolvedDepartment(complaint)
+                complaintDepartment.equals(currentUserDepartment, ignoreCase = true)
+            }
+            else -> false
+        }
+    }
+
+    private fun shouldDispatchLiveAlert(eventKey: String): Boolean {
+        if (eventKey.isBlank()) return true
+        return liveAlertComplaintKeys.add(eventKey)
+    }
+
+    private fun dispatchAlert(alert: AlertItem) {
+        AlertStorage.addAlert(this, alert)
+        AlertNotifier.show(this, alert)
+        Toast.makeText(
+            this,
+            "NEW REPORT: ${alert.title}\nID: ${alert.complaintDisplayId.ifBlank { "N/A" }}",
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
     private fun stopAdminMessageListener() {
         val ref = adminMessageRef
         val listener = adminMessageListener
@@ -390,6 +570,19 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         adminMessageListener = null
         adminMessageRef = null
         knownAdminMessageKeys.clear()
+    }
+
+    private fun stopComplaintListener() {
+        val ref = complaintRef
+        val listener = complaintListener
+        if (ref != null && listener != null) {
+            ref.removeEventListener(listener)
+        }
+
+        complaintListener = null
+        complaintRef = null
+        knownComplaintKeys.clear()
+        knownComplaintAssignments.clear()
     }
 
     private fun DataSnapshot.readAdminMessageValue(childKey: String): String =
@@ -404,25 +597,15 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         }
     }
 
-    private fun touchSession() {
-        SessionManager.refreshActivity(this)
-        scheduleSessionTimeout()
-    }
-
-    private fun scheduleSessionTimeout() {
-        sessionHandler.removeCallbacks(sessionTimeoutRunnable)
-        sessionHandler.postDelayed(sessionTimeoutRunnable, SessionManager.TIMEOUT_MS)
-    }
-
     private fun redirectToLogin(sessionExpired: Boolean) {
         stopAdminMessageListener()
-        sessionHandler.removeCallbacks(sessionTimeoutRunnable)
+        stopComplaintListener()
         auth.signOut()
         SessionManager.clear(this)
         startActivity(Intent(this, LoginActivity::class.java).apply {
             putExtra(SessionManager.EXTRA_SESSION_EXPIRED, sessionExpired)
             if (sessionExpired) {
-                putExtra(SessionManager.EXTRA_SESSION_MESSAGE, "Session expired due to inactivity.")
+                putExtra(SessionManager.EXTRA_SESSION_MESSAGE, "Session expired after staying away from the app for too long.")
             }
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         })
@@ -516,23 +699,23 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
             return
         }
 
-        touchSession()
+        SessionManager.refreshActivity(this)
     }
 
     override fun onPause() {
-        sessionHandler.removeCallbacks(sessionTimeoutRunnable)
         super.onPause()
+        SessionManager.markBackgrounded(this)
     }
 
     override fun onUserInteraction() {
         super.onUserInteraction()
-        touchSession()
+        SessionManager.refreshActivity(this)
     }
 
     override fun onDestroy() {
-        sessionHandler.removeCallbacks(sessionTimeoutRunnable)
         super.onDestroy()
         stopAdminMessageListener()
+        stopComplaintListener()
     }
 
 }

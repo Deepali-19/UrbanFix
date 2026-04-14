@@ -45,7 +45,7 @@
                 android:layout_height="wrap_content"
                 android:focusable="false"
                 android:inputType="none"
-                android:paddingStart="12dp"
+                android:paddingStart="38dp"
                 android:paddingEnd="12dp"
                 android:textColor="#111827"
                 android:textSize="14sp" />

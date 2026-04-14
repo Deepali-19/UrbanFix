@@ -115,23 +115,23 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
     private fun setupStaticFilterDropdowns() {
         setupDropdown(
             view = binding.actStatusFilter,
-            items = listOf("All Statuses", "Pending", "In Progress", "Resolved"),
-            defaultValue = "All Statuses"
+            items = statusOptions(),
+            defaultValue = getString(R.string.filter_all_statuses)
         )
         setupDropdown(
             view = binding.actPriorityFilter,
-            items = listOf("All Priorities", "High", "Medium", "Low"),
-            defaultValue = "All Priorities"
+            items = priorityOptions(),
+            defaultValue = getString(R.string.filter_all_priorities)
         )
         setupDropdown(
             view = binding.actSortFilter,
-            items = listOf("Newest First", "Oldest First", "High Priority First"),
-            defaultValue = "Newest First"
+            items = sortOptions(),
+            defaultValue = getString(R.string.sort_newest_first)
         )
         setupDropdown(
             view = binding.actDepartmentFilter,
-            items = listOf("All Departments"),
-            defaultValue = "All Departments"
+            items = listOf(getString(R.string.department_all)),
+            defaultValue = getString(R.string.department_all)
         )
     }
 
@@ -166,6 +166,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
                         }
 
                         hasLoadedComplaints = true
+                        syncEtaForVisibleComplaints()
                         updateDepartmentOptions()
                         applyFilters()
                     }
@@ -191,15 +192,27 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    private fun syncEtaForVisibleComplaints() {
+        if (currentRole == "Field Officer") return
+
+        val etaUpdates = ComplaintEtaManager.buildEtaUpdates(allComplaints)
+        etaUpdates.forEach { (complaintKey, updates) ->
+            db.child("Complaints").child(complaintKey).updateChildren(updates)
+        }
+    }
+
     private fun updateDepartmentOptions() {
         val selectedDepartment = binding.actDepartmentFilter.text?.toString().orEmpty()
-        val options = arrayListOf("All Departments")
-        options.addAll(APP_DEPARTMENTS)
+        val options = arrayListOf(getString(R.string.department_all))
+        options.addAll(APP_DEPARTMENTS.map { ComplaintDataFormatter.localizedDepartmentName(requireContext(), it) })
 
-        setupDropdown(binding.actDepartmentFilter, options, "All Departments")
+        setupDropdown(binding.actDepartmentFilter, options, getString(R.string.department_all))
 
         pendingDepartmentFilter?.let { requestedDepartment ->
-            val normalizedRequestedDepartment = normalizeDepartment(requestedDepartment)
+            val normalizedRequestedDepartment = ComplaintDataFormatter.localizedDepartmentName(
+                requireContext(),
+                normalizeDepartment(requestedDepartment)
+            )
             if (normalizedRequestedDepartment in options) {
                 binding.actDepartmentFilter.setText(normalizedRequestedDepartment, false)
                 pendingDepartmentFilter = null
@@ -234,24 +247,24 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
     private fun matchesStatus(complaint: Complaint, selectedStatus: String): Boolean {
         return when (selectedStatus) {
-            "Pending" -> complaint.status == 0
-            "In Progress" -> complaint.status == 1
-            "Resolved" -> complaint.status == 2
+            getString(R.string.status_pending) -> complaint.status == 0
+            getString(R.string.status_in_progress) -> complaint.status == 1
+            getString(R.string.status_resolved) -> complaint.status == 2
             else -> true
         }
     }
 
     private fun matchesPriority(complaint: Complaint, selectedPriority: String): Boolean {
         return when (selectedPriority) {
-            "High" -> complaint.priority == 2
-            "Medium" -> complaint.priority == 1
-            "Low" -> complaint.priority == 0
+            getString(R.string.priority_high) -> complaint.priority == 2
+            getString(R.string.priority_medium) -> complaint.priority == 1
+            getString(R.string.priority_low) -> complaint.priority == 0
             else -> true
         }
     }
 
     private fun matchesDepartment(complaint: Complaint, selectedDepartment: String): Boolean {
-        if (selectedDepartment.isBlank() || selectedDepartment == "All Departments") {
+        if (selectedDepartment.isBlank() || selectedDepartment == getString(R.string.department_all)) {
             return true
         }
 
@@ -260,8 +273,8 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
     private fun sortComparator(selectedSort: String): Comparator<Complaint> {
         return when (selectedSort) {
-            "Oldest First" -> compareBy { it.timestamp }
-            "High Priority First" -> compareByDescending<Complaint> { it.priority }
+            getString(R.string.sort_oldest_first) -> compareBy { it.timestamp }
+            getString(R.string.sort_high_priority_first) -> compareByDescending<Complaint> { it.priority }
                 .thenByDescending { it.timestamp }
             else -> compareByDescending { it.timestamp }
         }
@@ -269,6 +282,11 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
     private fun normalizeDepartment(value: String): String {
         return when (value.trim().lowercase()) {
+            getString(R.string.department_all).lowercase() -> "All Departments"
+            getString(R.string.department_water).lowercase() -> "Water"
+            getString(R.string.department_roads).lowercase() -> "Roads"
+            getString(R.string.department_sanitation).lowercase() -> "Sanitation"
+            getString(R.string.department_electricity).lowercase() -> "Electricity"
             "water" -> "Water"
             "road", "roads" -> "Roads"
             "sanitation", "sanitisation" -> "Sanitation"
@@ -313,12 +331,12 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         if (!this::binding.isInitialized) return
 
         pendingStatusFilter?.let {
-            binding.actStatusFilter.setText(it, false)
+            binding.actStatusFilter.setText(localizedStatusOption(it), false)
             pendingStatusFilter = null
         }
 
         pendingPriorityFilter?.let {
-            binding.actPriorityFilter.setText(it, false)
+            binding.actPriorityFilter.setText(localizedPriorityOption(it), false)
             pendingPriorityFilter = null
         }
 
@@ -329,7 +347,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
 
         pendingSortFilter?.let {
-            binding.actSortFilter.setText(it, false)
+            binding.actSortFilter.setText(localizedSortOption(it), false)
             pendingSortFilter = null
         }
 
@@ -348,10 +366,10 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         val resolved = complaints.count { it.status == 2 }
 
         showLoading(false)
-        binding.tvTotal.text = "Total: ${complaints.size}"
-        binding.tvPending.text = "Pending: $pending"
-        binding.tvProgress.text = "In Progress: $progress"
-        binding.tvResolved.text = "Resolved: $resolved"
+        binding.tvTotal.text = getString(R.string.summary_total, complaints.size)
+        binding.tvPending.text = getString(R.string.summary_pending, pending)
+        binding.tvProgress.text = getString(R.string.summary_progress, progress)
+        binding.tvResolved.text = getString(R.string.summary_resolved, resolved)
         binding.tvEmptyState.visibility = if (hasLoadedComplaints && complaints.isEmpty()) {
             View.VISIBLE
         } else {
@@ -391,6 +409,52 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
             if (currentValue !in items) {
                 view.setText(defaultValue, false)
             }
+        }
+    }
+
+    private fun statusOptions(): List<String> = listOf(
+        getString(R.string.filter_all_statuses),
+        getString(R.string.status_pending),
+        getString(R.string.status_in_progress),
+        getString(R.string.status_resolved)
+    )
+
+    private fun priorityOptions(): List<String> = listOf(
+        getString(R.string.filter_all_priorities),
+        getString(R.string.priority_high),
+        getString(R.string.priority_medium),
+        getString(R.string.priority_low)
+    )
+
+    private fun sortOptions(): List<String> = listOf(
+        getString(R.string.sort_newest_first),
+        getString(R.string.sort_oldest_first),
+        getString(R.string.sort_high_priority_first)
+    )
+
+    private fun localizedStatusOption(value: String): String {
+        return when (value) {
+            "Pending" -> getString(R.string.status_pending)
+            "In Progress" -> getString(R.string.status_in_progress)
+            "Resolved" -> getString(R.string.status_resolved)
+            else -> getString(R.string.filter_all_statuses)
+        }
+    }
+
+    private fun localizedPriorityOption(value: String): String {
+        return when (value) {
+            "High" -> getString(R.string.priority_high)
+            "Medium" -> getString(R.string.priority_medium)
+            "Low" -> getString(R.string.priority_low)
+            else -> getString(R.string.filter_all_priorities)
+        }
+    }
+
+    private fun localizedSortOption(value: String): String {
+        return when (value) {
+            "Oldest First" -> getString(R.string.sort_oldest_first)
+            "High Priority First" -> getString(R.string.sort_high_priority_first)
+            else -> getString(R.string.sort_newest_first)
         }
     }
 }

@@ -18,9 +18,11 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.example.urban.AppLocaleManager
 import com.example.urban.BuildConfig
 import com.bumptech.glide.Glide
 import com.example.urban.R
+import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
 import com.example.urban.loginSingUp.AppwriteManager
 import com.example.urban.loginSingUp.LoginActivity
 import com.example.urban.loginSingUp.SessionManager
@@ -135,7 +137,11 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnCancelSettings)
         val btnSave = dialogView.findViewById<MaterialButton>(R.id.btnSaveSettings)
 
-        val languageOptions = listOf("English", "Hindi", "Regional")
+        val languageOptions = listOf(
+            getString(R.string.language_option_english),
+            getString(R.string.language_option_hindi),
+            getString(R.string.language_option_system)
+        )
         languageInput.setAdapter(
             ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, languageOptions)
         )
@@ -144,7 +150,8 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
         switchDarkMode.isChecked = themePrefs.getBoolean(KEY_DARK_MODE, false)
         switchNotifications.isChecked = profilePrefs.getBoolean(KEY_NOTIFICATIONS, true)
-        languageInput.setText(profilePrefs.getString(KEY_LANGUAGE, "English"), false)
+        val currentLanguageCode = AppLocaleManager.currentLanguageCode(requireContext())
+        languageInput.setText(AppLocaleManager.labelForCode(requireContext(), currentLanguageCode), false)
 
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogView)
@@ -154,13 +161,15 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         btnSave.setOnClickListener {
             val darkMode = switchDarkMode.isChecked
             val notificationsEnabled = switchNotifications.isChecked
-            val language = languageInput.text?.toString().orEmpty().ifBlank { "English" }
+            val selectedLabel = languageInput.text?.toString().orEmpty()
+            val languageCode = AppLocaleManager.codeForLabel(requireContext(), selectedLabel)
+            val previousLanguageCode = AppLocaleManager.currentLanguageCode(requireContext())
 
             themePrefs.edit().putBoolean(KEY_DARK_MODE, darkMode).apply()
             profilePrefs.edit()
                 .putBoolean(KEY_NOTIFICATIONS, notificationsEnabled)
-                .putString(KEY_LANGUAGE, language)
                 .apply()
+            AppLocaleManager.saveLanguageCode(requireContext(), languageCode)
 
             AppCompatDelegate.setDefaultNightMode(
                 if (darkMode) {
@@ -169,10 +178,15 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
                     AppCompatDelegate.MODE_NIGHT_NO
                 }
             )
+            AppLocaleManager.applyLanguageCode(languageCode)
 
             loadPreferenceSummary()
             dialog.dismiss()
-            toast("Profile settings saved")
+            toast(getString(R.string.profile_settings_saved))
+
+            if (previousLanguageCode != languageCode) {
+                requireActivity().recreate()
+            }
         }
 
         dialog.show()
@@ -190,10 +204,10 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         val btnClose = dialogView.findViewById<MaterialButton>(R.id.btnCloseHelp)
 
         val roleName = user?.role?.ifBlank { "official" } ?: "official"
-        tvHelpBody.text = "Use this screen to manage your $roleName account details, identity proof, and personal preferences."
-        tvHelpTipOne.text = "Keep your profile photo updated so department teams can identify you quickly."
-        tvHelpTipTwo.text = "Review your official ID before demos to make sure your account looks verified and complete."
-        tvHelpTipThree.text = "Use Settings to switch theme, change language preference, or control notification behavior."
+        tvHelpBody.text = getString(R.string.profile_help_body, roleName)
+        tvHelpTipOne.text = getString(R.string.profile_help_tip_one)
+        tvHelpTipTwo.text = getString(R.string.profile_help_tip_two)
+        tvHelpTipThree.text = getString(R.string.profile_help_tip_three)
 
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogView)
@@ -206,15 +220,18 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
     private fun loadPreferenceSummary() {
         val isDarkMode = themePrefs.getBoolean(KEY_DARK_MODE, false)
         val notificationsEnabled = profilePrefs.getBoolean(KEY_NOTIFICATIONS, true)
-        val language = profilePrefs.getString(KEY_LANGUAGE, "English").orEmpty()
+        val languageCode = AppLocaleManager.currentLanguageCode(requireContext())
 
-        tvThemeValue.text = if (isDarkMode) "Dark Mode" else "Light Mode"
-        tvNotificationValue.text = if (notificationsEnabled) "Enabled" else "Muted"
-        tvLanguageValue.text = language
+        tvThemeValue.text = if (isDarkMode) getString(R.string.theme_dark) else getString(R.string.theme_light)
+        tvNotificationValue.text = if (notificationsEnabled) getString(R.string.notifications_enabled) else getString(R.string.notifications_muted)
+        tvLanguageValue.text = AppLocaleManager.labelForCode(requireContext(), languageCode)
     }
 
     private fun showImagePickerDialog() {
-        val options = arrayOf("Take Photo", "Choose from Gallery")
+        val options = arrayOf(
+            getString(R.string.image_picker_take_photo),
+            getString(R.string.image_picker_choose_gallery)
+        )
         AlertDialog.Builder(requireContext())
             .setItems(options) { _, which ->
                 when (which) {
@@ -288,12 +305,15 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
                     currentUser = user
 
                     tvName.text = user.name.ifBlank { "Urban Fix User" }
-                    tvEmail.text = user.email.ifBlank { "No email available" }
-                    tvRole.text = user.role.ifBlank { "Official" }
+                    tvEmail.text = user.email.ifBlank { getString(R.string.profile_no_email) }
+                    tvRole.text = localizedRoleLabel(user.role)
                     tvJoinedDate.text = formatJoinedDate(user.createdAt)
-                    tvDepartment.text = user.department.ifBlank { "General Department" }
-                    tvCity.text = user.city.ifBlank { "Not added" }
-                    tvEmployeeId.text = user.employeeId.ifBlank { "Not assigned" }
+                    tvDepartment.text = ComplaintDataFormatter.localizedDepartmentName(
+                        requireContext(),
+                        user.department.ifBlank { "General" }
+                    )
+                    tvCity.text = user.city.ifBlank { getString(R.string.profile_not_added) }
+                    tvEmployeeId.text = user.employeeId.ifBlank { getString(R.string.profile_not_assigned) }
 
                     if (user.profileImageUrl.isNotBlank()) {
                         Glide.with(requireContext())
@@ -306,12 +326,12 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
                     }
 
                     if (user.idProofUrl.isNotBlank()) {
-                        tvOfficialId.text = "View Official ID"
+                        tvOfficialId.text = getString(R.string.profile_view_official_id)
                         tvOfficialId.setOnClickListener {
                             showOfficialIdPreview(user.idProofUrl)
                         }
                     } else {
-                        tvOfficialId.text = "Official ID Not Uploaded"
+                        tvOfficialId.text = getString(R.string.profile_official_id_not_uploaded)
                         tvOfficialId.setOnClickListener(null)
                     }
                 }
@@ -356,8 +376,18 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
     }
 
     private fun formatJoinedDate(timestamp: Long): String {
-        if (timestamp <= 0L) return "Joined recently"
-        return "Joined ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(timestamp))}"
+        if (timestamp <= 0L) return getString(R.string.profile_joined_recently)
+        val date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(timestamp))
+        return getString(R.string.profile_joined_on, date)
+    }
+
+    private fun localizedRoleLabel(role: String): String {
+        return when (role) {
+            "Super Admin" -> getString(R.string.role_super_admin)
+            "Department Admin" -> getString(R.string.role_department_admin)
+            "Field Officer" -> getString(R.string.role_field_officer)
+            else -> getString(R.string.role_official)
+        }
     }
 
     private fun uriToFile(uri: Uri): File {

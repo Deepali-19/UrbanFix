@@ -54,7 +54,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Create Admin Account"
+                    android:text="@string/signup_title"
                     android:textColor="@android:color/white"
                     android:textSize="26sp"
                     android:textStyle="bold" />
@@ -66,7 +66,7 @@
                     android:layout_marginTop="8dp"
                     android:gravity="center"
                     android:lineSpacingExtra="2dp"
-                    android:text="Register a verified official profile for super admin, department admin, or field officer access."
+                    android:text="@string/signup_subtitle"
                     android:textColor="#EAF2FF"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -98,7 +98,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Official details"
+                    android:text="@string/signup_official_details"
                     android:textColor="#111827"
                     android:textSize="20sp"
                     android:textStyle="bold" />
@@ -107,7 +107,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="Complete all identity fields to create a trusted admin-side account."
+                    android:text="@string/signup_details_subtitle"
                     android:textColor="#667085"
                     android:textSize="13sp" />
 
@@ -123,7 +123,7 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Full name"
+                        android:hint="@string/signup_full_name"
                         android:minHeight="56dp"
                         android:textSize="15sp" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -140,7 +140,7 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Official email"
+                        android:hint="@string/auth_official_email"
                         android:inputType="textEmailAddress"
                         android:minHeight="56dp"
                         android:textSize="15sp" />
@@ -159,7 +159,7 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Password"
+                        android:hint="@string/auth_password"
                         android:inputType="textPassword"
                         android:minHeight="56dp"
                         android:textSize="15sp" />
@@ -178,7 +178,7 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Confirm password"
+                        android:hint="@string/signup_confirm_password"
                         android:inputType="textPassword"
                         android:minHeight="56dp"
                         android:textSize="15sp" />
@@ -198,7 +198,7 @@
                         android:id="@+id/actRole"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Select role"
+                        android:hint="@string/signup_select_role"
                         android:inputType="none"
                         android:minHeight="56dp"
                         android:textSize="15sp" />
@@ -218,7 +218,7 @@
                         android:id="@+id/actDepartment"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Select department"
+                        android:hint="@string/signup_select_department"
                         android:inputType="none"
                         android:minHeight="56dp"
                         android:textSize="15sp" />
@@ -236,7 +236,7 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="City / Municipality"
+                        android:hint="@string/signup_city"
                         android:minHeight="56dp"
                         android:textSize="15sp" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -253,7 +253,7 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Employee ID"
+                        android:hint="@string/signup_employee_id"
                         android:minHeight="56dp"
                         android:textSize="15sp" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -263,7 +263,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="54dp"
                     android:layout_marginTop="16dp"
-                    android:text="Upload Official ID Proof"
+                    android:text="@string/signup_upload_id"
                     android:textAllCaps="false"
                     android:textColor="#0B4CC2"
                     app:backgroundTint="#EAF2FF"
@@ -278,7 +278,7 @@
                     android:layout_height="56dp"
                     android:layout_marginTop="18dp"
                     android:backgroundTint="#0B4CC2"
-                    android:text="Create Account"
+                    android:text="@string/signup_create_account"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
                     android:textSize="16sp"
@@ -295,7 +295,7 @@
                         android:id="@+id/tvAlready"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Already have an account?"
+                        android:text="@string/signup_already_have_account"
                         android:textColor="#667085"
                         android:textSize="14sp" />
 
@@ -309,7 +309,7 @@
                         android:paddingTop="0dp"
                         android:paddingEnd="0dp"
                         android:paddingBottom="0dp"
-                        android:text="Login"
+                        android:text="@string/auth_login"
                         android:textAllCaps="false"
                         android:textColor="#0B4CC2"
                         android:textSize="14sp"

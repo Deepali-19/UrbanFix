@@ -6,6 +6,8 @@ import android.view.LayoutInflater
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.example.urban.AppLocaleManager
+import com.example.urban.R
 import com.example.urban.bottomNavigation.DashboardActivity
 import com.example.urban.databinding.ActivityLoginBinding
 import com.example.urban.databinding.DialogForgotPasswordBinding
@@ -17,6 +19,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppLocaleManager.applySavedLocale(this)
         super.onCreate(savedInstanceState)
 
         binding = ActivityLoginBinding.inflate(layoutInflater)
@@ -27,7 +30,7 @@ class LoginActivity : AppCompatActivity() {
         if (intent.getBooleanExtra(SessionManager.EXTRA_SESSION_EXPIRED, false)) {
             toast(
                 intent.getStringExtra(SessionManager.EXTRA_SESSION_MESSAGE)
-                    ?: "Session expired. Please login again."
+                    ?: getString(R.string.session_expired_login_again)
             )
         }
 
@@ -57,7 +60,7 @@ class LoginActivity : AppCompatActivity() {
         val password = binding.tilPassword.editText!!.text.toString().trim()
 
         if (email.isEmpty() || password.isEmpty()) {
-            toast("Enter email & password")
+            toast(getString(R.string.enter_email_password))
             return
         }
 
@@ -80,7 +83,7 @@ class LoginActivity : AppCompatActivity() {
                 finish()
             }
             .addOnFailureListener { e ->
-                toast(e.message ?: "Login failed")
+                toast(e.message ?: getString(R.string.login_failed))
             }
     }
 
@@ -95,10 +98,10 @@ class LoginActivity : AppCompatActivity() {
         }
 
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Reset Password")
+            .setTitle(R.string.forgot_password_title)
             .setView(dialogBinding.root)
-            .setPositiveButton("Send Reset Email", null) // null to prevent auto-dismiss
-            .setNegativeButton("Cancel", null)
+            .setPositiveButton(R.string.forgot_password_send_reset, null)
+            .setNegativeButton(R.string.common_cancel, null)
             .create()
 
         dialog.setOnShowListener {
@@ -107,7 +110,7 @@ class LoginActivity : AppCompatActivity() {
                 val email = dialogBinding.tilForgotEmail.editText!!.text.toString().trim()
 
                 if (email.isEmpty()) {
-                    dialogBinding.tilForgotEmail.error = "Please enter your email"
+                    dialogBinding.tilForgotEmail.error = getString(R.string.please_enter_your_email)
                     return@setOnClickListener
                 }
 
@@ -115,11 +118,11 @@ class LoginActivity : AppCompatActivity() {
 
                 auth.sendPasswordResetEmail(email)
                     .addOnSuccessListener {
-                        toast("Reset email sent! Check your inbox.")
+                        toast(getString(R.string.reset_email_sent))
                         dialog.dismiss()
                     }
                     .addOnFailureListener { e ->
-                        dialogBinding.tilForgotEmail.error = e.message ?: "Failed to send reset email"
+                        dialogBinding.tilForgotEmail.error = e.message ?: getString(R.string.failed_reset_email)
                     }
             }
         }
