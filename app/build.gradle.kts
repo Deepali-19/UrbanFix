@@ -43,6 +43,8 @@ val mapsApiKey = configValue("MAPS_API_KEY")
 val appwriteEndpoint = configValue("APPWRITE_ENDPOINT", "https://fra.cloud.appwrite.io/v1")
 val appwriteProjectId = configValue("APPWRITE_PROJECT_ID")
 val appwriteBucketId = configValue("APPWRITE_BUCKET_ID")
+val geminiApiKey = configValue("GEMINI_API_KEY")
+val geminiModel = configValue("GEMINI_MODEL", "gemini-2.5-flash")
 
 android {
     namespace = "com.example.urban"
@@ -63,6 +65,8 @@ android {
         buildConfigField("String", "APPWRITE_ENDPOINT", quoted(appwriteEndpoint))
         buildConfigField("String", "APPWRITE_PROJECT_ID", quoted(appwriteProjectId))
         buildConfigField("String", "APPWRITE_BUCKET_ID", quoted(appwriteBucketId))
+        buildConfigField("String", "GEMINI_API_KEY", quoted(geminiApiKey))
+        buildConfigField("String", "GEMINI_MODEL", quoted(geminiModel))
     }
     packaging {
         resources {

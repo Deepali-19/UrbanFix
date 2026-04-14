@@ -5,6 +5,7 @@ import java.util.Locale
 
 object ComplaintSnapshotParser {
 
+    // This creates a Complaint object from Firebase data, even when old records use mixed keys or types.
     fun fromSnapshot(snapshot: DataSnapshot): Complaint? {
         if (!snapshot.exists()) return null
 
@@ -31,6 +32,8 @@ object ComplaintSnapshotParser {
             etaUpdatedAt = readLong(snapshot, "etaUpdatedAt") ?: 0L,
             etaReason = readString(snapshot, "etaReason").orEmpty(),
             etaNotificationSentAt = readLong(snapshot, "etaNotificationSentAt") ?: 0L,
+            aiSuggestion = readString(snapshot, "aiSuggestion").orEmpty(),
+            aiSuggestionUpdatedAt = readLong(snapshot, "aiSuggestionUpdatedAt") ?: 0L,
             validation = readBoolean(snapshot, "validation") ?: false,
             readByAdmin = readBoolean(snapshot, "readByAdmin") ?: false,
             departmentId = readString(snapshot, "departmentId", "department").orEmpty()
@@ -40,6 +43,7 @@ object ComplaintSnapshotParser {
         return complaint
     }
 
+    // This reads the best available location text from the complaint snapshot.
     private fun readLocation(snapshot: DataSnapshot): String? {
         val direct = readString(snapshot, "location", "address", "selectedLocation")
         if (!direct.isNullOrBlank()) return direct
@@ -54,6 +58,7 @@ object ComplaintSnapshotParser {
         }
     }
 
+    // This reads latitude from direct fields or nested coordinate objects.
     private fun readLatitude(snapshot: DataSnapshot): Double? {
         return readDouble(snapshot, "latitude", "lat")
             ?: readNestedDouble(snapshot, "location", "latitude")
@@ -61,6 +66,7 @@ object ComplaintSnapshotParser {
             ?: readNestedDouble(snapshot, "latLng", "latitude")
     }
 
+    // This reads longitude from direct fields or nested coordinate objects.
     private fun readLongitude(snapshot: DataSnapshot): Double? {
         return readDouble(snapshot, "longitude", "lng", "lon")
             ?: readNestedDouble(snapshot, "location", "longitude")
@@ -68,6 +74,7 @@ object ComplaintSnapshotParser {
             ?: readNestedDouble(snapshot, "latLng", "longitude")
     }
 
+    // This reads the first non-empty string from a list of possible Firebase keys.
     private fun readString(snapshot: DataSnapshot, vararg keys: String): String? {
         for (key in keys) {
             val value = snapshot.child(key).value?.toString()?.trim().orEmpty()
@@ -78,6 +85,7 @@ object ComplaintSnapshotParser {
         return null
     }
 
+    // This reads a number as Long from a list of possible Firebase keys.
     private fun readLong(snapshot: DataSnapshot, vararg keys: String): Long? {
         for (key in keys) {
             val rawValue = snapshot.child(key).value ?: continue
@@ -93,6 +101,7 @@ object ComplaintSnapshotParser {
         return null
     }
 
+    // This reads a number as Int from a list of possible Firebase keys.
     private fun readInt(snapshot: DataSnapshot, vararg keys: String): Int? {
         for (key in keys) {
             val rawValue = snapshot.child(key).value ?: continue
@@ -108,6 +117,7 @@ object ComplaintSnapshotParser {
         return null
     }
 
+    // This reads a number as Double from a list of possible Firebase keys.
     private fun readDouble(snapshot: DataSnapshot, vararg keys: String): Double? {
         for (key in keys) {
             val rawValue = snapshot.child(key).value ?: continue
@@ -123,6 +133,7 @@ object ComplaintSnapshotParser {
         return null
     }
 
+    // This reads a boolean from Firebase, including simple string and numeric fallback values.
     private fun readBoolean(snapshot: DataSnapshot, vararg keys: String): Boolean? {
         for (key in keys) {
             val rawValue = snapshot.child(key).value ?: continue
@@ -144,6 +155,7 @@ object ComplaintSnapshotParser {
         return null
     }
 
+    // This reads a nested string from an object like location.address.
     private fun readNestedString(snapshot: DataSnapshot, parentKey: String, childKey: String): String? {
         val parent = snapshot.child(parentKey)
         if (!parent.exists()) return null
@@ -151,6 +163,7 @@ object ComplaintSnapshotParser {
         return value.takeIf { it.isNotBlank() && it.lowercase(Locale.getDefault()) != "null" }
     }
 
+    // This reads a nested double from an object like coordinates.latitude.
     private fun readNestedDouble(snapshot: DataSnapshot, parentKey: String, childKey: String): Double? {
         val parent = snapshot.child(parentKey)
         if (!parent.exists()) return null
@@ -164,6 +177,7 @@ object ComplaintSnapshotParser {
         }
     }
 
+    // This reads the image list safely from Firebase.
     private fun readStringList(snapshot: DataSnapshot, key: String): ArrayList<String> {
         val node = snapshot.child(key)
         if (!node.exists()) return arrayListOf()

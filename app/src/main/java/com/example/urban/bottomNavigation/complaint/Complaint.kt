@@ -25,6 +25,8 @@ data class Complaint(
     val etaUpdatedAt: Long = 0L,
     val etaReason: String = "",
     val etaNotificationSentAt: Long = 0L,
+    val aiSuggestion: String = "",
+    val aiSuggestionUpdatedAt: Long = 0L,
     val validation: Boolean = false,
     val readByAdmin: Boolean = false,
     val departmentId: String = "",

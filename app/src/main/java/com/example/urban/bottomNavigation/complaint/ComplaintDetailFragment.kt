@@ -17,6 +17,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
+import com.example.urban.BuildConfig
 import com.example.urban.R
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.firebase.auth.FirebaseAuth
@@ -53,13 +54,17 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
     private lateinit var tvAssignedOfficerValue: TextView
     private lateinit var tvValidationValue: TextView
     private lateinit var tvFeedbackValue: TextView
+    private lateinit var tvAiSuggestionMeta: TextView
+    private lateinit var tvAiSuggestionValue: TextView
     private lateinit var imgComplaint: ImageView
     private lateinit var btnOpenMap: Button
     private lateinit var btnPreviewImage: Button
     private lateinit var btnNotifyEta: Button
+    private lateinit var btnGenerateAiSuggestion: Button
 
     private lateinit var assignSection: View
     private lateinit var statusSection: View
+    private lateinit var aiSuggestionSection: View
     private lateinit var spOfficer: Spinner
     private lateinit var actPriority: MaterialAutoCompleteTextView
     private lateinit var cbValidated: CheckBox
@@ -78,7 +83,9 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
     private var userDepartment = ""
     private var isComplaintLoaded = false
     private var isRoleLoaded = false
+    private var isGeneratingAiSuggestion = false
 
+    // This prepares the screen, connects all views, and starts loading complaint data.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         database = FirebaseDatabase.getInstance().reference
 
@@ -102,13 +109,17 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         tvAssignedOfficerValue = view.findViewById(R.id.tvAssignedOfficerValue)
         tvValidationValue = view.findViewById(R.id.tvValidationValue)
         tvFeedbackValue = view.findViewById(R.id.tvFeedbackValue)
+        tvAiSuggestionMeta = view.findViewById(R.id.tvAiSuggestionMeta)
+        tvAiSuggestionValue = view.findViewById(R.id.tvAiSuggestionValue)
         imgComplaint = view.findViewById(R.id.imgComplaint)
         btnOpenMap = view.findViewById(R.id.btnOpenMap)
         btnPreviewImage = view.findViewById(R.id.btnPreviewImage)
         btnNotifyEta = view.findViewById(R.id.btnNotifyEta)
+        btnGenerateAiSuggestion = view.findViewById(R.id.btnGenerateAiSuggestion)
 
         assignSection = view.findViewById(R.id.assignSection)
         statusSection = view.findViewById(R.id.statusSection)
+        aiSuggestionSection = view.findViewById(R.id.aiSuggestionSection)
         spOfficer = view.findViewById(R.id.spOfficer)
         actPriority = view.findViewById(R.id.actPriority)
         cbValidated = view.findViewById(R.id.cbValidated)
@@ -128,11 +139,13 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         btnPreviewImage.setOnClickListener { previewComplaintImage() }
         imgComplaint.setOnClickListener { previewComplaintImage() }
         btnNotifyEta.setOnClickListener { notifyEtaToCivilian() }
+        btnGenerateAiSuggestion.setOnClickListener { generateAiSuggestion() }
 
         loadComplaint()
         loadUserRole()
     }
 
+    // This sets up the priority dropdown used by admins while editing complaint settings.
     private fun setupPriorityDropdown() {
         val items = listOf("Low", "Medium", "High")
         val adapter = ArrayAdapter(
@@ -151,6 +164,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    // This reads the selected complaint from Firebase and shows it on the detail screen.
     private fun loadComplaint() {
         val key = complaintKey ?: return
         isComplaintLoaded = false
@@ -184,6 +198,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             })
     }
 
+    // This fills the full complaint detail UI using the current complaint object.
     private fun bindComplaint(complaint: Complaint) {
         val displayId = complaint.complaintId.ifBlank {
             complaint.firebaseKey.ifBlank { "N/A" }
@@ -222,6 +237,8 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         } else {
             "Pending verification"
         }
+        tvAiSuggestionValue.text = complaint.aiSuggestion
+        tvAiSuggestionMeta.text = aiSuggestionMetaLabel(complaint)
         tvFeedbackValue.text = complaint.feedback.ifBlank { "No field remark yet" }
         tvAssignedOfficerValue.text = if (complaint.allottedOfficerId.isBlank()) {
             "Not assigned yet"
@@ -269,8 +286,10 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
 
         preselectAssignedOfficer(complaint.allottedOfficerId)
         updateEtaActionVisibility()
+        updateAiSuggestionVisibility()
     }
 
+    // This adds fallback values from raw Firebase keys so old complaint records still work.
     private fun hydrateComplaint(snapshot: DataSnapshot, complaint: Complaint): Complaint {
         val timestamp = complaint.timestamp.takeIf { it > 0L }
             ?: snapshot.readLong("timestamp", "timeStamp", "createdAt", "reportedOn")
@@ -317,12 +336,19 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             latitude = latitude,
             longitude = longitude,
             timestamp = timestamp,
+            aiSuggestion = complaint.aiSuggestion.ifBlank {
+                snapshot.readString("aiSuggestion") ?: ""
+            },
+            aiSuggestionUpdatedAt = complaint.aiSuggestionUpdatedAt.takeIf { it > 0L }
+                ?: snapshot.readLong("aiSuggestionUpdatedAt")
+                ?: 0L,
             departmentId = complaint.departmentId.ifBlank {
                 snapshot.readString("departmentId", "department") ?: ""
             }
         )
     }
 
+    // This loads citizen name and phone from the user record when the complaint itself does not have enough data.
     private fun loadCivilianDetails(civilianId: String) {
         database.child("Users").child(civilianId)
             .get()
@@ -352,6 +378,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             }
     }
 
+    // This updates the status badge UI color and text.
     private fun bindStatusBadge(status: Int) {
         tvStatusValue.text = statusLabel(status)
         when (status) {
@@ -361,6 +388,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    // This updates the priority badge UI color and text.
     private fun bindPriorityBadge(priority: Int) {
         tvPriorityValue.text = priorityLabel(priority)
         when (priority) {
@@ -370,6 +398,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    // This is used by field officers to update complaint status and remark text.
     private fun updateComplaintStatus() {
         if (userRole != "Field Officer") return
 
@@ -423,6 +452,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             }
     }
 
+    // This is used by admins to save assignment, priority, and validation changes.
     private fun saveAdminChanges() {
         if (userRole == "Field Officer") return
 
@@ -494,6 +524,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             }
     }
 
+    // This opens the complaint location in Google Maps using coordinates or address text.
     private fun openLocationInMaps() {
         val complaint = currentComplaint ?: return
         val hasCoordinates = complaint.latitude != 0.0 || complaint.longitude != 0.0
@@ -514,6 +545,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    // This shows the complaint image in a full-screen preview dialog.
     private fun previewComplaintImage() {
         val imageUrl = currentComplaint?.images?.firstOrNull()?.takeIf { it.isNotBlank() } ?: return
 
@@ -537,6 +569,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         dialog.show()
     }
 
+    // This prepares a resolution SMS message when a complaint is marked resolved.
     private fun sendSMS(phone: Long, complaintId: String) {
         if (phone <= 0L) return
 
@@ -544,6 +577,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         openSmsComposer(phone, message)
     }
 
+    // This sends the latest ETA update into the civilian app message node.
     private fun notifyEtaToCivilian() {
         val complaint = currentComplaint ?: return
         val key = complaintKey ?: return
@@ -585,6 +619,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             }
     }
 
+    // This opens the device SMS app with a prepared message.
     private fun openSmsComposer(phone: Long, message: String) {
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("smsto:$phone")
@@ -596,6 +631,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    // This reads the current logged-in user role so the correct controls can be shown.
     private fun loadUserRole() {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         isRoleLoaded = false
@@ -620,6 +656,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             })
     }
 
+    // This decides which parts of the detail screen are visible for admin and field officer roles.
     private fun configureUI() {
         assignSection.visibility = View.GONE
         statusSection.visibility = View.GONE
@@ -637,8 +674,10 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
 
         updateEtaActionVisibility()
+        updateAiSuggestionVisibility()
     }
 
+    // This loads all field officers for Super Admin assignment.
     private fun loadOfficers() {
         database.child("Users")
             .orderByChild("role")
@@ -664,6 +703,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             })
     }
 
+    // This loads only department-specific field officers for Department Admin assignment.
     private fun loadOfficersByDepartment(department: String) {
         database.child("Users")
             .orderByChild("department")
@@ -689,6 +729,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             })
     }
 
+    // This attaches the officer names to the assignment spinner.
     private fun bindOfficerSpinner() {
         val displayItems = if (officerNames.isEmpty()) {
             listOf("No field officers available")
@@ -707,6 +748,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         preselectAssignedOfficer(currentComplaint?.allottedOfficerId.orEmpty())
     }
 
+    // This preselects the already-assigned officer inside the spinner.
     private fun preselectAssignedOfficer(assignedOfficerId: String) {
         if (assignedOfficerId.isBlank()) return
 
@@ -716,6 +758,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    // This shows the assigned officer name in the detail section.
     private fun loadAssignedOfficerName(officerId: String) {
         database.child("Users").child(officerId)
             .get()
@@ -734,15 +777,18 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             }
     }
 
+    // This decides whether the loading state should still be visible.
     private fun updateLoadingState() {
         showLoading(!(isComplaintLoaded && isRoleLoaded))
     }
 
+    // This shows or hides the loading overlay.
     private fun showLoading(isLoading: Boolean) {
         loadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
         contentScroll.visibility = if (isLoading) View.GONE else View.VISIBLE
     }
 
+    // This converts the stored priority value into the label shown in UI.
     private fun priorityLabel(priority: Int): String {
         return when (priority) {
             2 -> "High"
@@ -751,6 +797,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    // This converts the selected priority label back into the stored numeric value.
     private fun priorityValueFromLabel(label: String): Int {
         return when (label) {
             "High" -> 2
@@ -759,6 +806,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    // This converts the stored status value into the label shown in UI.
     private fun statusLabel(status: Int): String {
         return when (status) {
             0 -> "Pending"
@@ -768,6 +816,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    // This marks a complaint as read when an admin opens it.
     private fun maybeMarkComplaintAsRead(complaint: Complaint) {
         val isAdminViewer = userRole == "Super Admin" || userRole == "Department Admin"
         if (!isAdminViewer || complaint.readByAdmin) return
@@ -784,6 +833,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
     }
 
+    // This recalculates ETA after complaint changes and saves it back if needed.
     private fun refreshEtaForComplaint(
         complaintKey: String,
         baseComplaint: Complaint,
@@ -854,6 +904,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             }
     }
 
+    // This decides when the ETA notification button should be visible.
     private fun updateEtaActionVisibility() {
         val complaint = currentComplaint
         val canSendEta = complaint != null &&
@@ -864,6 +915,92 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         btnNotifyEta.visibility = if (canSendEta) View.VISIBLE else View.GONE
     }
 
+    // This controls the visibility and enabled state of the AI suggestion section.
+    private fun updateAiSuggestionVisibility() {
+        val complaint = currentComplaint
+        aiSuggestionSection.visibility = if (complaint == null) View.GONE else View.VISIBLE
+
+        val isAllowedRole = userRole == "Super Admin" || userRole == "Department Admin" || userRole == "Field Officer"
+        btnGenerateAiSuggestion.visibility = if (isAllowedRole) View.VISIBLE else View.GONE
+        btnGenerateAiSuggestion.isEnabled = !isGeneratingAiSuggestion && BuildConfig.GEMINI_API_KEY.isNotBlank()
+
+        if (BuildConfig.GEMINI_API_KEY.isBlank() && complaint != null && complaint.aiSuggestion.isBlank()) {
+            tvAiSuggestionMeta.text = "AI suggestion is ready in the app, but the local Gemini key is not configured yet."
+        }
+    }
+
+    // This shows either the AI generation date or the helper line for the AI suggestion section.
+    private fun aiSuggestionMetaLabel(complaint: Complaint): String {
+        if (complaint.aiSuggestionUpdatedAt > 0L) {
+            val formatted = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+                .format(Date(complaint.aiSuggestionUpdatedAt))
+            return "Generated on $formatted"
+        }
+        return "Tap Generate Suggestion to get a practical resolution idea for this complaint."
+    }
+
+    // This asks Gemini for one complaint solution suggestion and saves it back to Firebase.
+    private fun generateAiSuggestion() {
+        val complaint = currentComplaint ?: return
+        val key = complaintKey ?: return
+
+        if (BuildConfig.GEMINI_API_KEY.isBlank()) {
+            Toast.makeText(
+                requireContext(),
+                "Add GEMINI_API_KEY in local secrets.properties first.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        isGeneratingAiSuggestion = true
+        btnGenerateAiSuggestion.isEnabled = false
+        btnGenerateAiSuggestion.text = "Generating..."
+        tvAiSuggestionMeta.text = "AI is preparing a practical resolution suggestion."
+
+        ComplaintAiSuggestionService.generateSuggestion(complaint) { result ->
+            activity?.runOnUiThread {
+                isGeneratingAiSuggestion = false
+                btnGenerateAiSuggestion.text = "Generate Suggestion"
+                btnGenerateAiSuggestion.isEnabled = true
+
+                result
+                    .onSuccess { aiResult ->
+                        val updates = mapOf(
+                            "aiSuggestion" to aiResult.suggestion,
+                            "aiSuggestionUpdatedAt" to aiResult.generatedAt
+                        )
+                        database.child("Complaints")
+                            .child(key)
+                            .updateChildren(updates)
+                            .addOnSuccessListener {
+                                val updatedComplaint = complaint.copy(
+                                    aiSuggestion = aiResult.suggestion,
+                                    aiSuggestionUpdatedAt = aiResult.generatedAt
+                                ).also {
+                                    it.firebaseKey = complaint.firebaseKey
+                                }
+                                currentComplaint = updatedComplaint
+                                tvAiSuggestionValue.text = aiResult.suggestion
+                                tvAiSuggestionMeta.text = aiSuggestionMetaLabel(updatedComplaint)
+                                updateAiSuggestionVisibility()
+                                Toast.makeText(requireContext(), "AI suggestion generated", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { error ->
+                                tvAiSuggestionMeta.text = error.message ?: "Failed to save AI suggestion"
+                                Toast.makeText(requireContext(), error.message ?: "Failed to save AI suggestion", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                    .onFailure { error ->
+                        tvAiSuggestionMeta.text = error.message ?: "AI suggestion failed"
+                        Toast.makeText(requireContext(), error.message ?: "AI suggestion failed", Toast.LENGTH_SHORT).show()
+                        updateAiSuggestionVisibility()
+                    }
+            }
+        }
+    }
+
+    // This shows whether ETA has already been sent to the civilian app.
     private fun etaNotifyStatusLabel(complaint: Complaint): String {
         if (complaint.etaNotificationSentAt <= 0L) {
             return "Not sent yet"
@@ -875,6 +1012,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }"
     }
 
+    // This helper reads the first non-empty string from possible Firebase keys.
     private fun DataSnapshot.readString(vararg keys: String): String? {
         for (key in keys) {
             val value = child(key).value?.toString()?.trim().orEmpty()
@@ -885,6 +1023,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         return null
     }
 
+    // This helper reads a Long value from possible Firebase keys.
     private fun DataSnapshot.readLong(vararg keys: String): Long? {
         for (key in keys) {
             val rawValue = child(key).value ?: continue
@@ -902,6 +1041,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         return null
     }
 
+    // This helper reads a Double value from possible Firebase keys.
     private fun DataSnapshot.readDouble(vararg keys: String): Double? {
         for (key in keys) {
             val rawValue = child(key).value ?: continue
@@ -919,6 +1059,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         return null
     }
 
+    // This helper reads a nested string like location.address from Firebase.
     private fun DataSnapshot.readNestedString(parentKey: String, childKey: String): String? {
         val parent = child(parentKey)
         if (!parent.exists()) return null
@@ -926,6 +1067,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         return value.takeIf { it.isNotBlank() && it.lowercase(Locale.getDefault()) != "null" }
     }
 
+    // This helper reads a nested double like coordinates.latitude from Firebase.
     private fun DataSnapshot.readNestedDouble(parentKey: String, childKey: String): Double? {
         val parent = child(parentKey)
         if (!parent.exists()) return null
@@ -943,6 +1085,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
     companion object {
         private const val ARG_COMPLAINT_KEY = "complaintKey"
 
+        // This creates the fragment with the complaint key that should be opened.
         fun newInstance(complaintKey: String): ComplaintDetailFragment {
             val fragment = ComplaintDetailFragment()
             val bundle = Bundle()
