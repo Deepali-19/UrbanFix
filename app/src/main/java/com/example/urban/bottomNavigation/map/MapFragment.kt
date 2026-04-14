@@ -20,6 +20,7 @@ import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
 import com.example.urban.bottomNavigation.complaint.ComplaintEtaManager
 import com.example.urban.bottomNavigation.complaint.ComplaintDetailFragment
 import com.example.urban.bottomNavigation.complaint.ComplaintFragment
+import com.example.urban.bottomNavigation.complaint.ComplaintSnapshotParser
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -330,8 +331,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
                 roleComplaints.clear()
 
                 for (child in snapshot.children) {
-                    val complaint = child.getValue(Complaint::class.java) ?: continue
-                    complaint.firebaseKey = child.key.orEmpty()
+                    val complaint = ComplaintSnapshotParser.fromSnapshot(child) ?: continue
 
                     if (shouldIncludeForRole(complaint)) {
                         roleComplaints.add(complaint)

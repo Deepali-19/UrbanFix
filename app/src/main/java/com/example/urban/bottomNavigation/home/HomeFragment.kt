@@ -16,6 +16,7 @@ import com.example.urban.bottomNavigation.complaint.Complaint
 import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
 import com.example.urban.bottomNavigation.complaint.ComplaintEtaManager
 import com.example.urban.bottomNavigation.complaint.ComplaintFragment
+import com.example.urban.bottomNavigation.complaint.ComplaintSnapshotParser
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.charts.PieChart
@@ -259,7 +260,7 @@ class HomeFragment : Fragment() {
                 val visibleComplaints = ArrayList<Complaint>()
 
                 for (item in snapshot.children) {
-                    val complaint = item.getValue(Complaint::class.java) ?: continue
+                    val complaint = ComplaintSnapshotParser.fromSnapshot(item) ?: continue
                     if (shouldIncludeComplaint(complaint, uid)) {
                         visibleComplaints.add(complaint)
                     }

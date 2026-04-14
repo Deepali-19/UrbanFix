@@ -26,6 +26,7 @@ import com.example.urban.bottomNavigation.alert.AlertStorage
 import com.example.urban.bottomNavigation.complaint.Complaint
 import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
 import com.example.urban.bottomNavigation.complaint.ComplaintFragment
+import com.example.urban.bottomNavigation.complaint.ComplaintSnapshotParser
 import com.example.urban.bottomNavigation.drawer.FO.FieldOfficerFragment
 import com.example.urban.bottomNavigation.home.HomeFragment
 import com.example.urban.bottomNavigation.map.MapFragment
@@ -418,9 +419,7 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
                 val complaintKey = snapshot.key.orEmpty()
                 if (complaintKey.isNotBlank() && !knownComplaintKeys.add(complaintKey)) return
 
-                val complaint = snapshot.getValue(Complaint::class.java)?.apply {
-                    firebaseKey = complaintKey
-                } ?: return
+                val complaint = ComplaintSnapshotParser.fromSnapshot(snapshot) ?: return
 
                 knownComplaintAssignments[complaintKey] = complaint.allottedOfficerId.trim()
 
@@ -455,9 +454,7 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
                 val complaintKey = snapshot.key.orEmpty()
                 if (complaintKey.isBlank()) return
 
-                val complaint = snapshot.getValue(Complaint::class.java)?.apply {
-                    firebaseKey = complaintKey
-                } ?: return
+                val complaint = ComplaintSnapshotParser.fromSnapshot(snapshot) ?: return
 
                 val previousOfficerId = knownComplaintAssignments[complaintKey].orEmpty()
                 val currentOfficerId = complaint.allottedOfficerId.trim()

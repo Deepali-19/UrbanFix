@@ -13,6 +13,7 @@ import com.example.urban.R
 import com.example.urban.bottomNavigation.complaint.Complaint
 import com.example.urban.bottomNavigation.complaint.ComplaintAdapter
 import com.example.urban.bottomNavigation.complaint.ComplaintDetailFragment
+import com.example.urban.bottomNavigation.complaint.ComplaintSnapshotParser
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -118,9 +119,7 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
 
                     for (data in snapshot.children) {
 
-                        val complaint =
-                            data.getValue(Complaint::class.java) ?: continue
-                        complaint.firebaseKey = data.key.orEmpty()
+                        val complaint = ComplaintSnapshotParser.fromSnapshot(data) ?: continue
 
                         complaintList.add(complaint)
                     }

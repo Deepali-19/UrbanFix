@@ -157,8 +157,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
                         allComplaints.clear()
 
                         for (data in snapshot.children) {
-                            val complaint = data.getValue(Complaint::class.java) ?: continue
-                            complaint.firebaseKey = data.key.orEmpty()
+                            val complaint = ComplaintSnapshotParser.fromSnapshot(data) ?: continue
 
                             if (shouldIncludeComplaint(complaint)) {
                                 allComplaints.add(complaint)

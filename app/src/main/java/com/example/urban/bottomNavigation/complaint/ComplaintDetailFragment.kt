@@ -160,7 +160,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .child(key)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
-                    val complaint = snapshot.getValue(Complaint::class.java)
+                    val complaint = ComplaintSnapshotParser.fromSnapshot(snapshot)
                     if (complaint == null) {
                         isComplaintLoaded = true
                         updateLoadingState()
@@ -794,9 +794,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .addOnSuccessListener { snapshot ->
                 val openDepartmentLoad = snapshot.children
                     .mapNotNull { item ->
-                        item.getValue(Complaint::class.java)?.apply {
-                            firebaseKey = item.key.orEmpty()
-                        }
+                        ComplaintSnapshotParser.fromSnapshot(item)
                     }
                     .count {
                         it.status != 2 &&
