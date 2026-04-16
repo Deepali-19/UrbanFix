@@ -8,6 +8,7 @@ import java.util.UUID
 
 class UrbanFixMessagingService : FirebaseMessagingService() {
 
+    // This function saves the latest FCM device token for the logged-in user.
     override fun onNewToken(token: String) {
         super.onNewToken(token)
 
@@ -19,6 +20,7 @@ class UrbanFixMessagingService : FirebaseMessagingService() {
             .setValue(token)
     }
 
+    // This function receives a remote message, stores it locally, and shows a notification.
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
 
@@ -33,7 +35,6 @@ class UrbanFixMessagingService : FirebaseMessagingService() {
             complaintDisplayId = data["complaintDisplayId"] ?: data["complaintId"].orEmpty()
         )
 
-        // Save every remote alert locally so the Alerts tab can show a persistent history.
         AlertStorage.addAlert(applicationContext, alert)
         AlertNotifier.show(applicationContext, alert)
     }

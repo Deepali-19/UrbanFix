@@ -57,7 +57,7 @@ object DashboardAnalytics {
     private const val OVERLOAD_THRESHOLD = 4
     private val activityFormatter = DateTimeFormatter.ofPattern("dd MMM, hh:mm a", Locale.getDefault())
 
-    // Central analytics builder so every dashboard widget reads the same filtered source of truth.
+    // This builds one complete dashboard metrics object from the visible complaint list.
     fun buildMetrics(
         complaints: List<Complaint>,
         range: DashboardRange,
@@ -198,6 +198,7 @@ object DashboardAnalytics {
         )
     }
 
+    // This converts the stored complaint status into a readable dashboard label.
     fun statusLabel(status: Int): String {
         return when (status) {
             0 -> "Pending"
@@ -207,15 +208,16 @@ object DashboardAnalytics {
         }
     }
 
+    // This shortens long department names so the department chart stays readable on small screens.
     fun departmentShortLabel(value: String): String {
         return when (value) {
-            // Short labels keep the department chart readable on smaller phones.
             "Sanitation" -> "Sanit."
             "Electricity" -> "Electric."
             else -> value
         }
     }
 
+    // This creates the plain text summary used when the dashboard is shared.
     fun shareSummaryText(
         metrics: DashboardMetrics,
         range: DashboardRange,
@@ -250,6 +252,7 @@ object DashboardAnalytics {
         var count: Int = 0
     )
 
+    // This builds the time buckets used by the dashboard trend chart.
     private fun buildTrendBuckets(range: DashboardRange, zoneId: ZoneId, today: LocalDate): List<TrendBucket> {
         return when (range) {
             DashboardRange.ALL_TIME -> {
@@ -317,6 +320,7 @@ object DashboardAnalytics {
         }
     }
 
+    // This places one complaint into the correct trend bucket for the current dashboard range.
     private fun assignTrendBucket(
         complaint: Complaint,
         buckets: List<TrendBucket>,
@@ -338,6 +342,7 @@ object DashboardAnalytics {
         }
     }
 
+    // This checks whether a complaint belongs inside the selected dashboard date range.
     private fun matchesRange(
         complaint: Complaint,
         range: DashboardRange,
@@ -359,10 +364,12 @@ object DashboardAnalytics {
         }
     }
 
+    // This provides a fallback anchor date for long-range trend buckets.
     private fun complaintsAnchorDate(today: LocalDate, zoneId: ZoneId): LocalDate {
         return today.plusDays(1)
     }
 
+    // This checks whether the complaint is near SLA breach or already overdue.
     private fun calculateSlaState(complaint: Complaint, zoneId: ZoneId): SlaState? {
         return when {
             ComplaintEtaManager.isOverdue(complaint) -> SlaState.OVERDUE
@@ -371,6 +378,7 @@ object DashboardAnalytics {
         }
     }
 
+    // This returns complaint resolution time in hours when the complaint is already resolved.
     private fun resolutionDurationHours(complaint: Complaint): Long? {
         if (complaint.status != 2 || complaint.timestamp <= 0L || complaint.resolvedAt <= 0L) return null
         val diff = complaint.resolvedAt - complaint.timestamp
@@ -378,6 +386,7 @@ object DashboardAnalytics {
         return diff / (1000 * 60 * 60)
     }
 
+    // This formats average hours into a friendlier admin-readable duration text.
     private fun formatDurationHours(hours: Double): String {
         return when {
             hours >= 48 -> String.format(Locale.getDefault(), "%.1f days", hours / 24.0)
@@ -386,11 +395,13 @@ object DashboardAnalytics {
         }
     }
 
+    // This converts a complaint timestamp into the short recent-activity label used on the dashboard.
     private fun formatActivityTime(timestamp: Long, zoneId: ZoneId): String {
         if (timestamp <= 0L) return "No time"
         return LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), zoneId).format(activityFormatter)
     }
 
+    // This converts epoch milliseconds into LocalDate for date comparison.
     private fun Long.toLocalDate(zoneId: ZoneId): LocalDate? {
         if (this <= 0L) return null
         return Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate()

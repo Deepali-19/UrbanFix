@@ -82,13 +82,12 @@ class DashboardActivity : AppCompatActivity() {
         isFreshLaunch = savedInstanceState == null
         openAlertsFromIntent = intent.getBooleanExtra(EXTRA_OPEN_ALERTS, false)
 
-        // ================= INIT =================
         bottomNav = findViewById(R.id.bottomNav)
         drawerLayout = findViewById(R.id.drawerLayout)
         navDrawer = findViewById(R.id.navDrawer)
         toolbar = findViewById(R.id.topBar)
 
-        // Keep the original multicolor menu drawables visible instead of tinting them to one flat color.
+        // Keep the colored icons as they are.
         bottomNav.itemIconTintList = null
         bottomNav.itemTextColor = AppCompatResources.getColorStateList(this, R.color.bottom_nav_icon_color)
 
@@ -97,7 +96,6 @@ class DashboardActivity : AppCompatActivity() {
         requestNotificationPermissionIfNeeded()
         SessionManager.refreshActivity(this)
 
-        // ================= BOTTOM NAVIGATION =================
         bottomNav.setOnItemSelectedListener {
             when (it.itemId) {
                 R.id.nav_home -> loadFragment(HomeFragment())
@@ -109,23 +107,12 @@ class DashboardActivity : AppCompatActivity() {
             true
         }
 
-        // ================= TOOLBAR CLICK =================
         toolbar.setNavigationOnClickListener {
-
             if (currentFragment is HomeFragment) {
                 drawerLayout.openDrawer(GravityCompat.START)
             }
         }
-//        toolbar.setNavigationOnClickListener {
-//
-//            if (drawerLayout.getDrawerLockMode(GravityCompat.START)
-//                == DrawerLayout.LOCK_MODE_UNLOCKED) {
-//
-//                drawerLayout.openDrawer(GravityCompat.START)
-//            }
-//        }
 
-        // ================= DRAWER MENU =================
         navDrawer.setNavigationItemSelectedListener {
 
             when (it.itemId) {
@@ -138,23 +125,13 @@ class DashboardActivity : AppCompatActivity() {
             drawerLayout.closeDrawer(GravityCompat.START)
             true}
 
-        // ================= LOAD USER DATA =================
         loadDrawerUserData()
-
-        // ================= FIX OLD USERS =================
         fixOldUserData()
-
-        // ================= ROLE BASED UI =================
         fetchUserRole()
-
-        // ================= FCM TOKEN =================
         saveDeviceToken()
-
-
     }
 
-    // ================= FRAGMENT + DRAWER CONTROL =================
-
+    // Opens the selected screen and updates drawer state.
     private fun loadFragment(fragment: Fragment) {
         currentFragment = fragment
 
@@ -162,19 +139,14 @@ class DashboardActivity : AppCompatActivity() {
             .replace(R.id.fragmentContainer, fragment)
             .commit()
 
-        //  Drawer logic
         if (fragment is HomeFragment) {
-
             toolbar.setNavigationIcon(R.drawable.navi_drawer)
             drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-
         } else {
-
             toolbar.navigationIcon = null
             drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
         }
 
-        //  Title change
         when (fragment) {
             is HomeFragment -> toolbar.title = getString(R.string.toolbar_dashboard)
             is ProfileFragment -> toolbar.title = getString(R.string.toolbar_profile)
@@ -184,46 +156,15 @@ class DashboardActivity : AppCompatActivity() {
             is FieldOfficerFragment -> toolbar.title = getString(R.string.toolbar_field_officers)
         }
 
-        //  Refresh menu
         invalidateOptionsMenu()
     }
-
-
-
-
-//        supportFragmentManager.beginTransaction()
-//            .replace(R.id.fragmentContainer, fragment)
-//            .commit()
-//
-//        if (fragment is HomeFragment) {
-//
-//            // ✅ SHOW DRAWER ONLY HERE
-//            toolbar.setNavigationIcon(R.drawable.navi_drawer)
-//            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-//
-//        } else {
-//
-//            // ❌ HIDE DRAWER
-//            toolbar.navigationIcon = null
-//            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-//        }
-//    }
-//    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-//
-//    if (currentFragment is ProfileFragment) {
-//        menuInflater.inflate(R.menu.profile_menu, menu)
-//        return true
-//    }
-//
-//    return super.onCreateOptionsMenu(menu)
-//}
 override fun onCreateOptionsMenu(menu: Menu): Boolean {
 
     menu.clear()
     return true
 }
-    // ================= ROLE =================
 
+    // Loads the current user role and department.
     private fun fetchUserRole() {
 
         val uid = auth.currentUser?.uid ?: run {
@@ -247,6 +188,7 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
             }
     }
 
+    // Applies role-based navigation rules.
     private fun setupBottomNav(role: String) {
 
         val menu = bottomNav.menu
@@ -270,6 +212,7 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         }
     }
 
+    // Picks the first screen for the current role.
     private fun loadDefaultFragmentForRole(role: String) {
         val defaultItemId = if (openAlertsFromIntent) {
             R.id.nav_alerts
@@ -283,8 +226,7 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         openAlertsFromIntent = false
     }
 
-    // ================= FCM =================
-
+    // Saves the latest FCM token in Firebase.
     private fun saveDeviceToken() {
 
         FirebaseMessaging.getInstance().token
@@ -302,6 +244,7 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
             }
     }
 
+    // Requests notification permission on Android 13+.
     private fun requestNotificationPermissionIfNeeded() {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -313,14 +256,14 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    // Listen to AdminMessages so new civilian reports reach the admin app immediately.
+    // Starts the live AdminMessages listener.
     private fun startAdminMessageListener() {
         if (adminMessageRef != null) return
 
         val ref = FirebaseDatabase.getInstance().getReference("AdminMessages")
         adminMessageRef = ref
 
-        // Prime the listener with existing message keys so only brand-new admin reports raise alerts.
+        // Warm up known keys so only new events trigger alerts.
         ref.get()
             .addOnSuccessListener { snapshot ->
                 knownAdminMessageKeys.clear()
@@ -328,12 +271,12 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
                 attachAdminMessageListener(ref)
             }
             .addOnFailureListener {
-                // If the warm-up read fails, still attach the live listener so future reports are not missed.
                 knownAdminMessageKeys.clear()
                 attachAdminMessageListener(ref)
             }
     }
 
+    // Hooks the AdminMessages child listener.
     private fun attachAdminMessageListener(ref: DatabaseReference) {
         if (adminMessageListener != null) return
 
@@ -361,8 +304,8 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         ref.addChildEventListener(adminMessageListener as ChildEventListener)
     }
 
+    // Builds an alert item from AdminMessages data.
     private fun buildAdminMessageAlert(snapshot: DataSnapshot): AlertItem {
-        // Support the civilian-side field names exactly as shared, including older typo variants.
         val title = snapshot.readAdminMessageValue("title")
             .ifBlank { snapshot.readAdminMessageValue("tle") }
             .ifBlank { snapshot.readAdminMessageValue(" tle") }
@@ -384,7 +327,7 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         )
     }
 
-    // Fall back to the Complaints node so admins still get a live alert even if AdminMessages is not written.
+    // Also watch Complaints directly as a fallback.
     private fun startComplaintListener() {
         if (complaintRef != null) return
 

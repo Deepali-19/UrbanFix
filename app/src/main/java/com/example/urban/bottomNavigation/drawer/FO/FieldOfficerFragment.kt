@@ -25,6 +25,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
 
     private val database = FirebaseDatabase.getInstance().reference
 
+    // Sets up the officer list screen.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         recyclerView = view.findViewById(R.id.recyclerView)
         loadingContainer = view.findViewById(R.id.officerLoadingContainer)
@@ -47,6 +48,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
         loadOfficers()
     }
 
+    // Loads all field officers.
     private fun loadOfficers() {
         showLoading(true)
 
@@ -83,6 +85,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
             })
     }
 
+    // Loads complaint counts for each officer.
     private fun loadComplaintMetrics(officers: List<FieldOfficer>) {
         val officerMap = officers.associateBy { it.uid }
 
@@ -128,6 +131,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
             })
     }
 
+    // Updates summary and empty state.
     private fun updateSummary() {
         val totalOfficers = list.size
         val activeOfficers = list.count { it.assignedCount > 0 || it.inProgressCount > 0 }
@@ -139,6 +143,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
         emptyView.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
     }
 
+    // Toggles loading state.
     private fun showLoading(isLoading: Boolean) {
         loadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
         recyclerView.visibility = if (isLoading) View.GONE else View.VISIBLE

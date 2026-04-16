@@ -20,6 +20,7 @@ class AppwriteManager private constructor(context: Context) {
         @Volatile
         private var INSTANCE: AppwriteManager? = null
 
+        // Shared Appwrite instance.
         fun getInstance(context: Context): AppwriteManager {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: AppwriteManager(context.applicationContext).also {
@@ -28,11 +29,13 @@ class AppwriteManager private constructor(context: Context) {
             }
         }
 
+        // Builds a file view URL.
         fun buildFileViewUrl(fileId: String, bucketId: String): String {
             return "${BuildConfig.APPWRITE_ENDPOINT}/storage/buckets/$bucketId/files/$fileId/view?project=${BuildConfig.APPWRITE_PROJECT_ID}"
         }
     }
 
+    // Uploads an image to Appwrite.
     suspend fun uploadImage(bucketId: String, file: File): io.appwrite.models.File {
         return storage.createFile(
             bucketId = bucketId,

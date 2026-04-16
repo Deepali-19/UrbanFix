@@ -94,6 +94,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
             }
         }
 
+    // Sets up the profile screen.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         themePrefs = requireContext().getSharedPreferences(PREF_THEME, android.content.Context.MODE_PRIVATE)
         profilePrefs = requireContext().getSharedPreferences(PREF_PROFILE, android.content.Context.MODE_PRIVATE)
@@ -127,6 +128,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         btnLogout.setOnClickListener { logoutUser() }
     }
 
+    // Opens settings dialog.
     fun openSettingsDialog() {
         if (!isAdded) return
 
@@ -192,6 +194,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         dialog.show()
     }
 
+    // Opens help dialog.
     fun openHelpDialog() {
         if (!isAdded) return
 
@@ -217,6 +220,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         dialog.show()
     }
 
+    // Refreshes the settings summary.
     private fun loadPreferenceSummary() {
         val isDarkMode = themePrefs.getBoolean(KEY_DARK_MODE, false)
         val notificationsEnabled = profilePrefs.getBoolean(KEY_NOTIFICATIONS, true)
@@ -227,6 +231,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         tvLanguageValue.text = AppLocaleManager.labelForCode(requireContext(), languageCode)
     }
 
+    // Lets the user pick camera or gallery.
     private fun showImagePickerDialog() {
         val options = arrayOf(
             getString(R.string.image_picker_take_photo),
@@ -242,6 +247,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
             .show()
     }
 
+    // Opens camera with a temp file.
     private fun openCamera() {
         val file = File(requireContext().cacheDir, "camera.jpg")
         tempCameraUri = FileProvider.getUriForFile(
@@ -252,7 +258,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         cameraLauncher.launch(tempCameraUri)
     }
 
-    // Upload and persist the profile image so the dashboard drawer and profile stay in sync.
+    // Uploads the profile image.
     private fun uploadImage(uri: Uri) {
         lifecycleScope.launch {
             cameraIcon.isEnabled = false
@@ -290,6 +296,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         }
     }
 
+    // Loads user data from Firebase.
     private fun loadUserData() {
         val uid = auth.currentUser?.uid ?: return
         showLoading(true)
@@ -343,6 +350,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
             })
     }
 
+    // Opens the official ID preview.
     private fun showOfficialIdPreview(imageUrl: String) {
         val dialog = Dialog(requireContext())
         dialog.setContentView(R.layout.dialog_id_preview)
@@ -363,6 +371,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         dialog.show()
     }
 
+    // Logs the user out.
     private fun logoutUser() {
         auth.signOut()
         SessionManager.clear(requireContext())
@@ -370,17 +379,20 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         requireActivity().finish()
     }
 
+    // Toggles loading state.
     private fun showLoading(isLoading: Boolean) {
         loadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
         contentScroll.visibility = if (isLoading) View.GONE else View.VISIBLE
     }
 
+    // Formats joined date.
     private fun formatJoinedDate(timestamp: Long): String {
         if (timestamp <= 0L) return getString(R.string.profile_joined_recently)
         val date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(timestamp))
         return getString(R.string.profile_joined_on, date)
     }
 
+    // Returns the display label for a role.
     private fun localizedRoleLabel(role: String): String {
         return when (role) {
             "Super Admin" -> getString(R.string.role_super_admin)
@@ -390,6 +402,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         }
     }
 
+    // Copies image into cache before upload.
     private fun uriToFile(uri: Uri): File {
         val inputStream = requireContext().contentResolver.openInputStream(uri)
         val file = File(requireContext().cacheDir, "profile.jpg")
@@ -402,6 +415,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         return file
     }
 
+    // Small toast helper.
     private fun toast(message: String) {
         Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }

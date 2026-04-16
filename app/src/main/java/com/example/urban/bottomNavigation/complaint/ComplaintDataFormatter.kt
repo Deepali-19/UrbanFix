@@ -5,10 +5,12 @@ import com.example.urban.R
 
 object ComplaintDataFormatter {
 
+    // This checks whether a complaint has valid coordinate data.
     fun hasCoordinates(complaint: Complaint): Boolean {
         return complaint.latitude != 0.0 || complaint.longitude != 0.0
     }
 
+    // This returns the best readable location label for complaint UI.
     fun locationLabel(complaint: Complaint): String {
         val location = complaint.location.trim()
         return when {
@@ -18,6 +20,7 @@ object ComplaintDataFormatter {
         }
     }
 
+    // This returns the latitude and longitude text shown in complaint detail screens.
     fun coordinatesLabel(complaint: Complaint): String {
         return if (hasCoordinates(complaint)) {
             String.format("%.5f, %.5f", complaint.latitude, complaint.longitude)
@@ -26,6 +29,7 @@ object ComplaintDataFormatter {
         }
     }
 
+    // This returns the translated location label for UI screens that use string resources.
     fun localizedLocationLabel(context: Context, complaint: Complaint): String {
         val location = complaint.location.trim()
         return when {
@@ -35,6 +39,7 @@ object ComplaintDataFormatter {
         }
     }
 
+    // This returns the translated coordinates label for UI screens that use string resources.
     fun localizedCoordinatesLabel(context: Context, complaint: Complaint): String {
         return if (hasCoordinates(complaint)) {
             String.format("%.5f, %.5f", complaint.latitude, complaint.longitude)
@@ -43,6 +48,7 @@ object ComplaintDataFormatter {
         }
     }
 
+    // This decides the complaint department either from stored departmentId or from issue type text.
     fun resolvedDepartment(complaint: Complaint): String {
         val directDepartment = normalizeDepartment(complaint.departmentId)
         if (directDepartment != null) return directDepartment
@@ -57,6 +63,7 @@ object ComplaintDataFormatter {
         }
     }
 
+    // This converts department text into the app's standard department names.
     fun normalizeDepartment(value: String): String? {
         return when (value.trim().lowercase()) {
             "" -> null
@@ -68,6 +75,7 @@ object ComplaintDataFormatter {
         }
     }
 
+    // This returns the translated department name for the current app language.
     fun localizedDepartmentName(context: Context, value: String): String {
         return when (normalizeDepartment(value).orEmpty()) {
             "Water" -> context.getString(R.string.department_water)

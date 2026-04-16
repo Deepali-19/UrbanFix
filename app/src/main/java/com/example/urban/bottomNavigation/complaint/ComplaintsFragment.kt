@@ -32,6 +32,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
             "Electricity"
         )
 
+        // This creates a bundle of filters so other screens can open the complaint list in a pre-filtered state.
         fun filterBundle(
             status: String? = null,
             priority: String? = null,
@@ -68,6 +69,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
     private var pendingRangeFilter: String? = null
     private var pendingComplaintKeys: ArrayList<String>? = null
 
+    // This starts listening for incoming dashboard filter requests.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -85,6 +87,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This prepares the complaint list UI, adapter, filters, and Firebase loading.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding = FragmentComplaintsBinding.bind(view)
         showLoading(true)
@@ -112,6 +115,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         loadComplaints()
     }
 
+    // This sets the default dropdown values used before complaint data is loaded.
     private fun setupStaticFilterDropdowns() {
         setupDropdown(
             view = binding.actStatusFilter,
@@ -135,6 +139,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         )
     }
 
+    // This reapplies filters whenever the user changes any filter box.
     private fun setupFilterListeners() {
         binding.actStatusFilter.setOnItemClickListener { _, _, _, _ -> applyFilters() }
         binding.actPriorityFilter.setOnItemClickListener { _, _, _, _ -> applyFilters() }
@@ -142,6 +147,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         binding.actSortFilter.setOnItemClickListener { _, _, _, _ -> applyFilters() }
     }
 
+    // This loads the current user role first, then reads complaints and keeps only the ones visible to that role.
     private fun loadComplaints() {
         currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
 
@@ -180,6 +186,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
             }
     }
 
+    // This checks whether one complaint should appear for the logged-in role.
     private fun shouldIncludeComplaint(complaint: Complaint): Boolean {
         return when (currentRole) {
             "Super Admin" -> true
@@ -191,6 +198,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This recalculates ETA for visible complaints so admin users always see fresh estimates.
     private fun syncEtaForVisibleComplaints() {
         if (currentRole == "Field Officer") return
 
@@ -200,6 +208,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This fills the department filter dropdown with translated department names.
     private fun updateDepartmentOptions() {
         val selectedDepartment = binding.actDepartmentFilter.text?.toString().orEmpty()
         val options = arrayListOf(getString(R.string.department_all))
@@ -224,6 +233,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This applies all active filters and updates the RecyclerView with the result.
     private fun applyFilters() {
         val selectedStatus = binding.actStatusFilter.text?.toString().orEmpty()
         val selectedPriority = binding.actPriorityFilter.text?.toString().orEmpty()
@@ -244,6 +254,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         updateSummary(filteredComplaints)
     }
 
+    // This checks whether one complaint matches the selected status filter.
     private fun matchesStatus(complaint: Complaint, selectedStatus: String): Boolean {
         return when (selectedStatus) {
             getString(R.string.status_pending) -> complaint.status == 0
@@ -253,6 +264,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This checks whether one complaint matches the selected priority filter.
     private fun matchesPriority(complaint: Complaint, selectedPriority: String): Boolean {
         return when (selectedPriority) {
             getString(R.string.priority_high) -> complaint.priority == 2
@@ -262,6 +274,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This checks whether one complaint matches the selected department filter.
     private fun matchesDepartment(complaint: Complaint, selectedDepartment: String): Boolean {
         if (selectedDepartment.isBlank() || selectedDepartment == getString(R.string.department_all)) {
             return true
@@ -270,6 +283,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         return ComplaintDataFormatter.resolvedDepartment(complaint) == normalizeDepartment(selectedDepartment)
     }
 
+    // This returns the correct sorting rule based on the selected sort option.
     private fun sortComparator(selectedSort: String): Comparator<Complaint> {
         return when (selectedSort) {
             getString(R.string.sort_oldest_first) -> compareBy { it.timestamp }
@@ -279,6 +293,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This converts translated department values back into the app's standard internal department names.
     private fun normalizeDepartment(value: String): String {
         return when (value.trim().lowercase()) {
             getString(R.string.department_all).lowercase() -> "All Departments"
@@ -294,7 +309,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
-    // Map drill-down can pass a hidden set of complaint keys so the list opens on one hotspot only.
+    // This is used when the map opens the list for only one hotspot or complaint group.
     private fun matchesComplaintSelection(
         complaint: Complaint,
         requestedComplaintKeys: ArrayList<String>?
@@ -305,7 +320,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         return complaintKey in requestedComplaintKeys
     }
 
-    // Dashboard can pass a hidden time window so drill-down stays scoped.
+    // This is used when the dashboard opens the list with a hidden date range filter.
     private fun matchesDashboardRange(complaint: Complaint, requestedRange: String?): Boolean {
         val timestamp = complaint.timestamp
         if (requestedRange.isNullOrBlank() || timestamp <= 0L) {
@@ -326,6 +341,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This applies filters that were passed from other screens like dashboard or map.
     private fun applyPendingDashboardFilters() {
         if (!this::binding.isInitialized) return
 
@@ -359,6 +375,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This updates the summary strip and the empty state text.
     private fun updateSummary(complaints: List<Complaint>) {
         val pending = complaints.count { it.status == 0 }
         val progress = complaints.count { it.status == 1 }
@@ -376,11 +393,13 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This shows or hides the loading view while complaints are being prepared.
     private fun showLoading(isLoading: Boolean) {
         binding.complaintsLoadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
         binding.complaintsContentContainer.visibility = if (isLoading) View.GONE else View.VISIBLE
     }
 
+    // This attaches items to a dropdown and keeps a safe default selected value.
     private fun setupDropdown(
         view: com.google.android.material.textfield.MaterialAutoCompleteTextView,
         items: List<String>,
@@ -411,6 +430,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This returns the translated status filter options shown to the user.
     private fun statusOptions(): List<String> = listOf(
         getString(R.string.filter_all_statuses),
         getString(R.string.status_pending),
@@ -418,6 +438,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         getString(R.string.status_resolved)
     )
 
+    // This returns the translated priority filter options shown to the user.
     private fun priorityOptions(): List<String> = listOf(
         getString(R.string.filter_all_priorities),
         getString(R.string.priority_high),
@@ -425,12 +446,14 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         getString(R.string.priority_low)
     )
 
+    // This returns the translated sort options shown to the user.
     private fun sortOptions(): List<String> = listOf(
         getString(R.string.sort_newest_first),
         getString(R.string.sort_oldest_first),
         getString(R.string.sort_high_priority_first)
     )
 
+    // This maps dashboard status values into the currently selected app language.
     private fun localizedStatusOption(value: String): String {
         return when (value) {
             "Pending" -> getString(R.string.status_pending)
@@ -440,6 +463,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This maps dashboard priority values into the currently selected app language.
     private fun localizedPriorityOption(value: String): String {
         return when (value) {
             "High" -> getString(R.string.priority_high)
@@ -449,6 +473,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         }
     }
 
+    // This maps dashboard sort values into the currently selected app language.
     private fun localizedSortOption(value: String): String {
         return when (value) {
             "Oldest First" -> getString(R.string.sort_oldest_first)

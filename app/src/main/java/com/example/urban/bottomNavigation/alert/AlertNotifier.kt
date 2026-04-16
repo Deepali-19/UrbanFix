@@ -15,6 +15,7 @@ object AlertNotifier {
 
     const val CHANNEL_ID = "urban_fix_alerts"
 
+    // This function creates the Android notification channel used for complaint alerts.
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
@@ -30,6 +31,7 @@ object AlertNotifier {
         manager.createNotificationChannel(channel)
     }
 
+    // This function shows one system notification and opens the alerts tab when tapped.
     fun show(context: Context, alert: AlertItem) {
         ensureChannel(context)
 

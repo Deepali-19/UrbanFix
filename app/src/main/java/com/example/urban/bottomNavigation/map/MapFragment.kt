@@ -60,12 +60,14 @@ import kotlin.math.roundToInt
 
 class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
+    // These are the three map presentation styles available in the screen.
     private enum class MapMode {
         DENSITY,
         DEPARTMENT,
         MARKERS
     }
 
+    // This model keeps the grouped complaints used for hotspot rendering and the bottom sheet.
     private data class MapCluster(
         val complaints: List<Complaint>,
         val center: LatLng,
@@ -137,6 +139,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             }
         }
 
+    // This function connects all map views and starts loading the user role and map fragment.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
         mapLoadingContainer = view.findViewById(R.id.mapLoadingContainer)
@@ -176,6 +179,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         loadCurrentUser()
     }
 
+    // This function attaches the Google map fragment inside the current screen.
     private fun setupMapFragment() {
         val existingMapFragment =
             childFragmentManager.findFragmentById(R.id.mapContainer) as? SupportMapFragment
@@ -189,6 +193,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         mapFragment.getMapAsync(this)
     }
 
+    // This function sets all chip and button listeners used to control the map.
     private fun setupControls() {
         chipGroupModes.setOnCheckedStateChangeListener { _, checkedIds ->
             val selectedId = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
@@ -239,6 +244,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This function runs when Google Map is ready and applies the first map settings.
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
         isMapReady = true
@@ -258,6 +264,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         renderMap()
     }
 
+    // This function reads the logged-in user role and department before loading complaint data.
     private fun loadCurrentUser() {
         currentUid = auth.currentUser?.uid ?: run {
             isUserLoaded = true
@@ -281,7 +288,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             }
     }
 
-    // Admin roles get analysis views, while field officers get direct operational markers only.
+    // This function updates the visible map controls based on the current user role.
     private fun configureRoleUi() {
         when (currentRole) {
             "Field Officer" -> {
@@ -320,6 +327,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This function listens to complaint changes and keeps the map data synced with Firebase.
     private fun listenToComplaints() {
         complaintsRef?.let { ref ->
             complaintsListener?.let(ref::removeEventListener)
@@ -351,6 +359,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         complaintsRef?.addValueEventListener(complaintsListener as ValueEventListener)
     }
 
+    // This function checks whether a complaint belongs to the current user's map scope.
     private fun shouldIncludeForRole(complaint: Complaint): Boolean {
         return when (currentRole) {
             "Super Admin" -> true
@@ -360,6 +369,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This function decides what should be drawn on the map after filters and role rules are applied.
     private fun renderMap() {
         if (!isMapReady || !isUserLoaded) return
 
@@ -384,6 +394,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         moveCameraToComplaints(filteredComplaints)
     }
 
+    // This function returns only the complaints that match the current role and active filters.
     private fun currentVisibleComplaints(): List<Complaint> {
         val scopedComplaints = if (currentRole == "Field Officer") {
             roleComplaints
@@ -399,12 +410,14 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This function checks whether a complaint belongs to the compact recent time window.
     private fun isRecentComplaint(complaint: Complaint): Boolean {
         if (complaint.timestamp <= 0L) return false
         val age = System.currentTimeMillis() - complaint.timestamp
         return age <= RECENT_WINDOW_MS
     }
 
+    // This function adds a small fade effect when the user switches map modes.
     private fun animateMapModeChange() {
         mapOverlayContent.animate()
             .alpha(0.9f)
@@ -418,6 +431,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             .start()
     }
 
+    // This function enables the blue current-location layer when permission is available.
     private fun enableCurrentLocationLayer() {
         val map = googleMap ?: return
         if (!hasFineLocationPermission()) return
@@ -427,6 +441,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This function moves the camera to the device location or falls back to complaint points.
     private fun centerOnUserLocation() {
         if (!hasFineLocationPermission()) {
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -452,6 +467,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             }
     }
 
+    // This function checks if fine location permission is already granted.
     private fun hasFineLocationPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             requireContext(),
@@ -459,8 +475,10 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    // This helper converts Android Location into Google Maps LatLng.
     private fun Location.toLatLng(): LatLng = LatLng(latitude, longitude)
 
+    // This function finds the nearest complaint to a selected anchor point.
     private fun nearestComplaintTo(
         anchor: LatLng,
         complaints: List<Complaint>
@@ -474,6 +492,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             }
     }
 
+    // This function clears previous markers, heatmaps, and listeners before drawing a new map state.
     private fun clearRenderedLayers() {
         googleMap?.setOnMarkerClickListener(null)
         googleMap?.setOnCameraIdleListener(null)
@@ -488,7 +507,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         hotspotMarkers.clear()
     }
 
-    // Density mode highlights complaint pressure while still leaving hotspot pins clickable.
+    // This function draws the complaint heat map and clickable hotspot markers.
     private fun renderDensityHeatMap(complaints: List<Complaint>) {
         val heatPoints = complaints.weightedHeatPoints()
         if (heatPoints.isEmpty()) return
@@ -517,12 +536,13 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         renderHotspotMarkers(hotspotClusters, useDepartmentColor = true, withAreaCircles = false)
     }
 
-    // Department mode shows which service dominates each area instead of using a busy heat layer.
+    // This function draws department-dominant hotspots with colored area circles.
     private fun renderDepartmentHotspots(complaints: List<Complaint>) {
         val clusters = buildClusters(complaints)
         renderHotspotMarkers(clusters, useDepartmentColor = true, withAreaCircles = true)
     }
 
+    // This function draws hotspot markers and optional circles for grouped complaint areas.
     private fun renderHotspotMarkers(
         clusters: List<MapCluster>,
         useDepartmentColor: Boolean,
@@ -569,6 +589,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This function shows individual complaint markers using Google Maps clustering.
     private fun renderComplaintMarkers(complaints: List<Complaint>) {
         val map = googleMap ?: return
         val validComplaints = complaints.filter(::hasValidCoordinate)
@@ -595,6 +616,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         manager.cluster()
     }
 
+    // This function updates the map counters and summary text under the filters.
     private fun updateSummary(complaints: List<Complaint>) {
         val visibleCount = complaints.size
         val overdueCount = complaints.count(::isOverdue)
@@ -647,6 +669,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This function moves the camera to fit the visible complaint points on screen.
     private fun moveCameraToComplaints(complaints: List<Complaint>) {
         val points = complaints.validMapPoints()
         val map = googleMap ?: return
@@ -668,6 +691,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 140))
     }
 
+    // This function opens the bottom sheet for one marker or one hotspot selection.
     private fun showSelectionSheet(
         complaints: List<Complaint>,
         center: LatLng,
@@ -746,6 +770,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         dialog.show()
     }
 
+    // This function opens the complaints screen with filters for the selected map area.
     private fun openComplaintsForSelection(complaints: List<Complaint>) {
         val complaintKeys = ArrayList(
             complaints.mapNotNull { complaint ->
@@ -767,6 +792,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             .commit()
     }
 
+    // This function opens the full complaint detail screen for a single selected complaint.
     private fun openComplaintDetail(complaint: Complaint) {
         val complaintKey = complaint.firebaseKey.ifBlank { complaint.complaintId }
         if (complaintKey.isBlank()) return
@@ -777,6 +803,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             .commit()
     }
 
+    // This function opens Google Maps directions for the selected location.
     private fun openDirections(center: LatLng, label: String) {
         val uri = Uri.parse("geo:0,0?q=${center.latitude},${center.longitude}(${Uri.encode(label)})")
         val preferredIntent = Intent(Intent.ACTION_VIEW, uri).apply {
@@ -791,6 +818,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This function gives officers a nearest route shortcut when multiple complaints are selected.
     private fun openRouteForSelection(
         complaints: List<Complaint>,
         fallbackCenter: LatLng,
@@ -811,6 +839,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         openDirections(fallbackCenter, fallbackLabel)
     }
 
+    // This function groups nearby complaints into simple map clusters using a grid cell size.
     private fun buildClusters(complaints: List<Complaint>): List<MapCluster> {
         val groupedComplaints = complaints
             .filter(::hasValidCoordinate)
@@ -834,6 +863,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This function finds the most common department inside a complaint group.
     private fun dominantDepartment(complaints: List<Complaint>): String {
         return complaints
             .groupingBy { ComplaintDataFormatter.resolvedDepartment(it) }
@@ -843,9 +873,11 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             ?: "General"
     }
 
+    // This helper returns the resolved department label for a single complaint.
     private fun dominantDepartment(complaint: Complaint): String =
         ComplaintDataFormatter.resolvedDepartment(complaint)
 
+    // This function finds the most repeated issue type in the given complaint list.
     private fun topIssueType(complaints: List<Complaint>): String {
         return complaints
             .groupingBy { it.issueType.ifBlank { "General complaint" } }
@@ -855,6 +887,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             ?: "General complaint"
     }
 
+    // This function chooses the best location label to describe a hotspot area.
     private fun dominantLocation(complaints: List<Complaint>): String {
         val location = complaints
             .map { it.location.trim() }
@@ -868,6 +901,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             ?: "Location not available"
     }
 
+    // This helper increases heat strength for priority and SLA-risk complaints.
     private fun Complaint.weightForHeat(): Int {
         var weight = 1
         if (priority == 2) weight += 2
@@ -878,6 +912,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         return weight.coerceAtMost(6)
     }
 
+    // This helper converts complaints into repeated heat points so important complaints glow more.
     private fun List<Complaint>.weightedHeatPoints(): List<LatLng> {
         val points = mutableListOf<LatLng>()
         filter(::hasValidCoordinate).forEach { complaint ->
@@ -888,6 +923,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         return points
     }
 
+    // This function updates the selected department chip from a department value.
     private fun checkDepartmentChip(value: String) {
         when (value) {
             "Water" -> chipDepartmentWater.isChecked = true
@@ -898,6 +934,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This helper converts complaint status codes into readable labels.
     private fun statusLabel(status: Int): String {
         return when (status) {
             1 -> "In Progress"
@@ -906,6 +943,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This helper maps complaint status into the marker color hue.
     private fun statusHue(status: Int): Float {
         return when (status) {
             1 -> BitmapDescriptorFactory.HUE_ORANGE
@@ -914,6 +952,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This helper returns the main color used for a department hotspot.
     private fun departmentColor(department: String): Int {
         return when (department) {
             "Water" -> Color.parseColor("#2563EB")
@@ -924,6 +963,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This helper returns the Google marker hue used for a department hotspot.
     private fun departmentHue(department: String): Float {
         return when (department) {
             "Water" -> BitmapDescriptorFactory.HUE_AZURE
@@ -934,6 +974,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This helper adds transparency to a solid color for the hotspot area circle.
     private fun withAlpha(color: Int, alpha: Int): Int {
         return Color.argb(
             alpha.coerceIn(0, 255),
@@ -943,6 +984,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         )
     }
 
+    // This helper normalizes department names so filters and role checks stay consistent.
     private fun normalizeDepartment(value: String): String {
         return when (value.trim().lowercase(Locale.getDefault())) {
             "water" -> "Water"
@@ -953,30 +995,37 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    // This helper checks whether a department is part of the supported map filters.
     private fun isSupportedDepartment(value: String): Boolean {
         return normalizeDepartment(value) in setOf("Water", "Roads", "Sanitation", "Electricity")
     }
 
+    // This helper makes sure complaint coordinates are usable before drawing them on the map.
     private fun hasValidCoordinate(complaint: Complaint): Boolean {
         return complaint.latitude.absoluteValue > 0.0001 && complaint.longitude.absoluteValue > 0.0001
     }
 
+    // This helper extracts only valid map points from a complaint list.
     private fun List<Complaint>.validMapPoints(): List<LatLng> {
         return filter(::hasValidCoordinate).map { LatLng(it.latitude, it.longitude) }
     }
 
+    // This helper checks whether a complaint is close to its SLA limit.
     private fun isNearBreach(complaint: Complaint): Boolean {
         return ComplaintEtaManager.isNearBreach(complaint)
     }
 
+    // This helper checks whether a complaint has already crossed its SLA time.
     private fun isOverdue(complaint: Complaint): Boolean {
         return ComplaintEtaManager.isOverdue(complaint)
     }
 
+    // This helper returns the SLA hours for one complaint from the shared ETA manager.
     private fun slaHoursFor(complaint: Complaint): Double {
         return ComplaintEtaManager.slaHoursFor(complaint)
     }
 
+    // This function removes map listeners and Firebase listeners when the view is destroyed.
     override fun onDestroyView() {
         complaintsListener?.let { listener ->
             complaintsRef?.removeEventListener(listener)
@@ -988,11 +1037,13 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         super.onDestroyView()
     }
 
+    // This renderer customizes clustered complaint markers without changing the clustering logic.
     private inner class ComplaintClusterRenderer(
         map: GoogleMap,
         clusterManager: ClusterManager<ComplaintClusterItem>
     ) : DefaultClusterRenderer<ComplaintClusterItem>(requireContext(), map, clusterManager) {
 
+        // This function sets the marker title, subtitle, and color for one complaint point.
         override fun onBeforeClusterItemRendered(
             item: ComplaintClusterItem,
             markerOptions: MarkerOptions
@@ -1005,6 +1056,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
                 .icon(BitmapDescriptorFactory.defaultMarker(statusHue(item.complaint.status)))
         }
 
+        // This function decides when Google Maps should group nearby markers into a cluster.
         override fun shouldRenderAsCluster(cluster: Cluster<ComplaintClusterItem>): Boolean {
             return cluster.size > 1
         }

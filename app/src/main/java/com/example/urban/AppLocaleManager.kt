@@ -13,21 +13,25 @@ object AppLocaleManager {
     const val LANGUAGE_ENGLISH = "en"
     const val LANGUAGE_HINDI = "hi"
 
+    // Applies saved app language.
     fun applySavedLocale(context: Context) {
         applyLanguageCode(currentLanguageCode(context))
     }
 
+    // Returns saved language code.
     fun currentLanguageCode(context: Context): String {
         val prefs = context.getSharedPreferences(PREF_PROFILE, Context.MODE_PRIVATE)
         val storedValue = prefs.getString(KEY_LANGUAGE, LANGUAGE_ENGLISH).orEmpty()
         return normalizeLanguageCode(storedValue)
     }
 
+    // Saves selected language.
     fun saveLanguageCode(context: Context, languageCode: String) {
         val prefs = context.getSharedPreferences(PREF_PROFILE, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_LANGUAGE, normalizeLanguageCode(languageCode)).apply()
     }
 
+    // Applies app locale.
     fun applyLanguageCode(languageCode: String) {
         val normalizedCode = normalizeLanguageCode(languageCode)
         val languageTags = when (normalizedCode) {
@@ -38,6 +42,7 @@ object AppLocaleManager {
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(languageTags))
     }
 
+    // Gets label for a language code.
     fun labelForCode(context: Context, languageCode: String): String {
         return when (normalizeLanguageCode(languageCode)) {
             LANGUAGE_HINDI -> context.getString(R.string.language_option_hindi)
@@ -46,6 +51,7 @@ object AppLocaleManager {
         }
     }
 
+    // Converts label back to code.
     fun codeForLabel(context: Context, label: String): String {
         return when (label.trim()) {
             context.getString(R.string.language_option_hindi) -> LANGUAGE_HINDI
@@ -57,6 +63,7 @@ object AppLocaleManager {
         }
     }
 
+    // Normalizes language values.
     private fun normalizeLanguageCode(rawValue: String): String {
         return when (rawValue.trim().lowercase()) {
             "hi", "hindi" -> LANGUAGE_HINDI

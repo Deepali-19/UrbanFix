@@ -15,9 +15,11 @@ class AlertAdapter(
     private val click: (AlertItem) -> Unit
 ) : RecyclerView.Adapter<AlertAdapter.AlertViewHolder>() {
 
+    // This holder keeps references to the alert item views used by the RecyclerView.
     inner class AlertViewHolder(val binding: ItemAlertBinding) :
         RecyclerView.ViewHolder(binding.root)
 
+    // This function creates the view holder for one alert row.
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AlertViewHolder {
         val binding = ItemAlertBinding.inflate(
             LayoutInflater.from(parent.context),
@@ -27,8 +29,10 @@ class AlertAdapter(
         return AlertViewHolder(binding)
     }
 
+    // This function tells the RecyclerView how many alerts need to be shown.
     override fun getItemCount(): Int = items.size
 
+    // This function binds one alert item to the visible row UI.
     override fun onBindViewHolder(holder: AlertViewHolder, position: Int) {
         val alert = items[position]
         holder.binding.tvAlertTitle.text = localizedTitle(holder, alert)
@@ -50,11 +54,13 @@ class AlertAdapter(
         holder.itemView.setOnClickListener { click(alert) }
     }
 
+    // This function replaces the current alert list and refreshes the RecyclerView.
     fun updateItems(newItems: List<AlertItem>) {
         items = newItems
         notifyDataSetChanged()
     }
 
+    // This function builds the date and complaint id text shown below each alert.
     private fun buildMeta(alert: AlertItem): String {
         val dateLabel = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
             .format(Date(alert.timestamp))
@@ -65,6 +71,7 @@ class AlertAdapter(
         }
     }
 
+    // This function converts stored alert types into translated labels for the UI.
     private fun localizedType(holder: AlertViewHolder, alert: AlertItem): String {
         val context = holder.binding.root.context
         return when (alert.type) {
@@ -76,6 +83,7 @@ class AlertAdapter(
         }
     }
 
+    // This function converts saved internal titles into user-friendly translated titles.
     private fun localizedTitle(holder: AlertViewHolder, alert: AlertItem): String {
         val context = holder.binding.root.context
         return when (alert.title) {
@@ -86,6 +94,7 @@ class AlertAdapter(
         }
     }
 
+    // This function converts saved alert body text into readable translated messages.
     private fun localizedBody(holder: AlertViewHolder, alert: AlertItem): String {
         val context = holder.binding.root.context
         return when {

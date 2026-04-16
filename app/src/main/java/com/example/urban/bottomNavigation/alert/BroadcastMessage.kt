@@ -1,5 +1,6 @@
 package com.example.urban.bottomNavigation.alert
 
+// This model stores one broadcast message that can be sent to civilians from the admin app.
 data class BroadcastMessage(
     val id: String = "",
     val title: String = "",

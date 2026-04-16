@@ -42,6 +42,7 @@ class SingUpActivity : AppCompatActivity() {
             }
         }
 
+    // Sets up the signup screen.
     override fun onCreate(savedInstanceState: Bundle?) {
         AppLocaleManager.applySavedLocale(this)
         super.onCreate(savedInstanceState)
@@ -65,6 +66,7 @@ class SingUpActivity : AppCompatActivity() {
         }
     }
 
+    // Sets up role and department dropdowns.
     private fun setupDropdowns() {
 
         val roles = listOf("Super Admin", "Department Admin", "Field Officer")
@@ -91,6 +93,7 @@ class SingUpActivity : AppCompatActivity() {
         updateDepartmentVisibility(binding.actRole.text?.toString().orEmpty())
     }
 
+    // Hides department for Super Admin.
     private fun updateDepartmentVisibility(role: String) {
         val isSuperAdmin = role == "Super Admin"
         binding.tilDepartment.visibility = if (isSuperAdmin) View.GONE else View.VISIBLE
@@ -100,11 +103,14 @@ class SingUpActivity : AppCompatActivity() {
         }
     }
 
+    // Password rule check.
     private fun isValidPassword(password: String): Boolean {
         val pattern =
             Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@#\$%^&+=!]).{8,}$")
         return pattern.matches(password)
     }
+
+    // Validates the form and creates the account.
     private fun registerUser() {
 
         val name = binding.tilName.editText!!.text.toString().trim()
@@ -191,66 +197,7 @@ class SingUpActivity : AppCompatActivity() {
             }
     }
 
-//    private fun registerUser() {
-//
-//        val name = binding.tilName.editText!!.text.toString().trim()
-//        val email = binding.tilEmail.editText!!.text.toString().trim()
-//        val password = binding.tilPassword.editText!!.text.toString().trim()
-//        val confirm = binding.tilConfirmPassword.editText!!.text.toString().trim()
-//        val role = binding.actRole.text.toString().trim()
-//        val department = binding.actDepartment.text.toString().trim()
-//        val city = binding.tilCity.editText!!.text.toString().trim()
-//        val employeeId = binding.tilEmployeeId.editText!!.text.toString().trim()
-//
-//        if (name.isEmpty() || email.isEmpty() || password.isEmpty() || confirm.isEmpty()) {
-//            toast("Fill all required fields")
-//            return
-//        }
-//
-//        if (!isValidPassword(password)) {
-//            binding.tilConfirmPassword.error =
-//                "*Password must be 8+ characters with uppercase, lowercase, number and special character"
-//            return
-//        }
-//
-//        if (password != confirm) {
-//            binding.tilConfirmPassword.error = "*Password doesn't match"
-//            return
-//        } else {
-//            binding.tilConfirmPassword.error = null
-//        }
-//
-//        if (uploadedImageUrl.isEmpty()) {
-//            toast("Upload official ID proof first")
-//            return
-//        }
-//
-//        auth.createUserWithEmailAndPassword(email, password)
-//            .addOnSuccessListener {
-//
-//                val uid = auth.currentUser!!.uid
-//
-//                val user = User(
-//                    name,
-//                    email,
-//                    role,
-//                    department,
-//                    city,
-//                    employeeId,
-//                    uploadedImageUrl
-//                )
-//
-//                database.child("users").child(uid).setValue(user)
-//
-//                toast("Account created successfully")
-//
-//                startActivity(Intent(this, LoginActivity::class.java))
-//                finish()
-//            }
-//            .addOnFailureListener {
-//                toast(it.message ?: "Signup failed")
-//            }
-//    }
+    // Uploads the ID proof image.
     private fun startUpload(file: File) {
         lifecycleScope.launch {
             try {
@@ -273,6 +220,8 @@ class SingUpActivity : AppCompatActivity() {
             }
         }
     }
+
+    // Copies picked image into cache.
     private fun uriToFile(uri: Uri): File {
         val inputStream = contentResolver.openInputStream(uri)
         val tempFile = File(cacheDir, "image.jpg")
@@ -285,6 +234,7 @@ class SingUpActivity : AppCompatActivity() {
         return tempFile
     }
 
+    // Small toast helper.
     private fun toast(msg: String) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }

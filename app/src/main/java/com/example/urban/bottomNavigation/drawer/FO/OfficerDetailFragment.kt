@@ -1,11 +1,9 @@
 package com.example.urban.bottomNavigation.drawer.FO
 
 import android.os.Bundle
-import androidx.fragment.app.Fragment
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.widget.TextView
+import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -40,6 +38,7 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
     private var isOfficerLoaded = false
     private var isComplaintsLoaded = false
 
+    // Sets up the officer detail screen.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         loadingContainer = view.findViewById(R.id.officerDetailLoadingContainer)
         emptyView = view.findViewById(R.id.tvOfficerComplaintEmpty)
@@ -69,6 +68,7 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
         loadComplaints()
     }
 
+    // Loads officer profile details.
     private fun loadOfficerDetails() {
         val targetOfficerId = officerId ?: return
         database.child("Users").child(targetOfficerId)
@@ -106,6 +106,7 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
             }
     }
 
+    // Loads assigned complaints.
     private fun loadComplaints() {
 
         database.child("Complaints")
@@ -139,6 +140,7 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
             })
     }
 
+    // Updates the complaint summary.
     private fun updateComplaintSummary() {
         val assignedCount = complaintList.size
         val activeCount = complaintList.count { it.status == 1 }
@@ -148,10 +150,12 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
         emptyView.visibility = if (assignedCount == 0) View.VISIBLE else View.GONE
     }
 
+    // Hides loader when both calls finish.
     private fun updateLoadingState() {
         showLoading(!(isOfficerLoaded && isComplaintsLoaded))
     }
 
+    // Toggles loading state.
     private fun showLoading(isLoading: Boolean) {
         loadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
         recyclerView.visibility = if (isLoading) View.GONE else View.VISIBLE
@@ -162,6 +166,7 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
 
     companion object {
 
+        // Creates the fragment with the officer id.
         fun newInstance(id: String): OfficerDetailFragment {
 
             val fragment = OfficerDetailFragment()

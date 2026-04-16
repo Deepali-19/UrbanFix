@@ -1,5 +1,6 @@
 package com.example.urban.bottomNavigation.alert
 
+// This model represents one saved notification entry shown in the alert center.
 data class AlertItem(
     val id: String,
     val title: String,

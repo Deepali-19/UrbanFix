@@ -53,6 +53,7 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
     )
     private val broadcastDepartmentOptions = listOf("All Departments") + supportedDepartments
 
+    // Sets up the alerts screen.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         loadingContainer = view.findViewById(R.id.alertsLoadingContainer)
         contentContainer = view.findViewById(R.id.alertsContentContainer)
@@ -101,11 +102,13 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         refreshAlerts()
     }
 
+    // Reload alerts when coming back.
     override fun onResume() {
         super.onResume()
         refreshAlerts()
     }
 
+    // Loads alerts and updates counters.
     private fun refreshAlerts() {
         val alerts = AlertStorage.getAlerts(requireContext())
         val unreadCount = alerts.count { !it.isRead }
@@ -120,6 +123,7 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         loadingContainer.visibility = View.GONE
     }
 
+    // Loads user role for broadcast access.
     private fun loadCurrentUserAccess() {
         val uid = auth.currentUser?.uid ?: run {
             configureBroadcastAccess()
@@ -140,7 +144,7 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
             }
     }
 
-    // Broadcast is intentionally restricted: Super Admin can target anyone, Department Admin only their own department.
+    // Shows or hides broadcast controls.
     private fun configureBroadcastAccess() {
         when (currentUserRole) {
             "Super Admin" -> {
@@ -175,6 +179,7 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         }
     }
 
+    // Opens the broadcast dialog.
     private fun showBroadcastDialog() {
         if (currentUserRole != "Super Admin" && currentUserRole != "Department Admin") {
             Toast.makeText(requireContext(), getString(R.string.alerts_broadcast_admin_only), Toast.LENGTH_SHORT).show()
@@ -196,7 +201,6 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         if (currentUserRole == "Super Admin") {
             tilDepartment.visibility = View.VISIBLE
             tvLockedDepartment.visibility = View.GONE
-            tvBroadcastScope.text = "Choose a department or keep it city-wide for all civilians."
             tvBroadcastScope.text = getString(R.string.alerts_broadcast_scope_super)
             actDepartment.setAdapter(
                 ArrayAdapter(
@@ -277,7 +281,7 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         dialog.show()
     }
 
-    // Broadcasts are written to Firebase so the civilian app can listen and display the same message live.
+    // Sends the broadcast message.
     private fun sendBroadcastMessage(
         title: String,
         body: String,
@@ -327,6 +331,7 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
             }
     }
 
+    // Normalizes department names.
     private fun normalizeDepartment(value: String): String {
         return when (value.trim().lowercase()) {
             "all departments", "all" -> "All Departments"
@@ -338,6 +343,7 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         }
     }
 
+    // Checks supported departments.
     private fun isSupportedDepartment(value: String): Boolean =
         supportedDepartments.contains(normalizeDepartment(value))
 }

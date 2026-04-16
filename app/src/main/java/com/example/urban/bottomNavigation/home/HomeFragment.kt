@@ -10,13 +10,13 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.fragment.app.Fragment
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.urban.R
 import com.example.urban.bottomNavigation.complaint.Complaint
 import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
 import com.example.urban.bottomNavigation.complaint.ComplaintEtaManager
 import com.example.urban.bottomNavigation.complaint.ComplaintFragment
 import com.example.urban.bottomNavigation.complaint.ComplaintSnapshotParser
+import com.example.urban.databinding.FragmentHomeBinding
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.charts.PieChart
@@ -47,8 +47,10 @@ import java.time.ZoneId
 
 class HomeFragment : Fragment() {
 
+    private var _binding: FragmentHomeBinding? = null
+    private val binding get() = _binding!!
+
     private lateinit var loadingContainer: View
-    private lateinit var swipeRefreshLayout: SwipeRefreshLayout
     private lateinit var contentLayout: ScrollView
     private lateinit var chartSection: View
     private lateinit var emptyStateCard: View
@@ -114,66 +116,68 @@ class HomeFragment : Fragment() {
     private var currentBarDepartments: List<String> = emptyList()
     private var complaintsListener: ValueEventListener? = null
 
+    // This creates the dashboard screen layout.
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        return inflater.inflate(R.layout.fragment_home, container, false)
+        _binding = FragmentHomeBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
+    // This connects all dashboard views and starts loading the data.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        loadingContainer = view.findViewById(R.id.homeLoadingContainer)
-        swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout)
-        contentLayout = view.findViewById(R.id.contentLayout)
-        chartSection = view.findViewById(R.id.chartSection)
-        emptyStateCard = view.findViewById(R.id.emptyStateCard)
-        recentActivityCard = view.findViewById(R.id.recentActivityCard)
-        recentActivityContainer = view.findViewById(R.id.recentActivityContainer)
+        loadingContainer = binding.homeLoadingContainer
+        contentLayout = binding.contentLayout
+        chartSection = binding.chartSection
+        emptyStateCard = binding.emptyStateCard
+        recentActivityCard = binding.recentActivityCard
+        recentActivityContainer = binding.recentActivityContainer
 
-        pieChart = view.findViewById(R.id.pieChartStatus)
-        barChart = view.findViewById(R.id.barChartDepartment)
-        lineChart = view.findViewById(R.id.lineChartTrend)
+        pieChart = binding.pieChartStatus
+        barChart = binding.barChartDepartment
+        lineChart = binding.lineChartTrend
 
-        tvGreeting = view.findViewById(R.id.tvGreeting)
-        tvSubtitle = view.findViewById(R.id.tvSubtitle)
-        tvScopeTag = view.findViewById(R.id.tvScopeTag)
-        tvLastUpdated = view.findViewById(R.id.tvLastUpdated)
-        tvRangeCaption = view.findViewById(R.id.tvRangeCaption)
-        tvTrendSubtitle = view.findViewById(R.id.tvTrendSubtitle)
-        tvTotal = view.findViewById(R.id.tvTotal)
-        tvPending = view.findViewById(R.id.tvPendingCount)
-        tvProgress = view.findViewById(R.id.tvProgressCount)
-        tvResolved = view.findViewById(R.id.tvResolvedCount)
-        tvHighPriority = view.findViewById(R.id.tvHighPriorityCount)
-        tvToday = view.findViewById(R.id.tvTodayCount)
-        tvMonth = view.findViewById(R.id.tvMonthCount)
-        tvResolutionRate = view.findViewById(R.id.tvResolutionRate)
-        tvTopDepartment = view.findViewById(R.id.tvTopDepartment)
-        tvNearBreachCount = view.findViewById(R.id.tvNearBreachCount)
-        tvOverdueCount = view.findViewById(R.id.tvOverdueCount)
-        tvActiveOfficers = view.findViewById(R.id.tvActiveOfficers)
-        tvOverloadedOfficers = view.findViewById(R.id.tvOverloadedOfficers)
-        tvTopHandler = view.findViewById(R.id.tvTopHandler)
-        tvTopIssueType = view.findViewById(R.id.tvTopIssueType)
-        tvAverageResolutionTime = view.findViewById(R.id.tvAverageResolutionTime)
-        tvFastestDepartment = view.findViewById(R.id.tvFastestDepartment)
-        tvEmptyTitle = view.findViewById(R.id.tvEmptyTitle)
-        tvEmptyBody = view.findViewById(R.id.tvEmptyBody)
-        tvRecentActivityEmpty = view.findViewById(R.id.tvRecentActivityEmpty)
+        tvGreeting = binding.tvGreeting
+        tvSubtitle = binding.tvSubtitle
+        tvScopeTag = binding.tvScopeTag
+        tvLastUpdated = binding.tvLastUpdated
+        tvRangeCaption = binding.tvRangeCaption
+        tvTrendSubtitle = binding.tvTrendSubtitle
+        tvTotal = binding.tvTotal
+        tvPending = binding.tvPendingCount
+        tvProgress = binding.tvProgressCount
+        tvResolved = binding.tvResolvedCount
+        tvHighPriority = binding.tvHighPriorityCount
+        tvToday = binding.tvTodayCount
+        tvMonth = binding.tvMonthCount
+        tvResolutionRate = binding.tvResolutionRate
+        tvTopDepartment = binding.tvTopDepartment
+        tvNearBreachCount = binding.tvNearBreachCount
+        tvOverdueCount = binding.tvOverdueCount
+        tvActiveOfficers = binding.tvActiveOfficers
+        tvOverloadedOfficers = binding.tvOverloadedOfficers
+        tvTopHandler = binding.tvTopHandler
+        tvTopIssueType = binding.tvTopIssueType
+        tvAverageResolutionTime = binding.tvAverageResolutionTime
+        tvFastestDepartment = binding.tvFastestDepartment
+        tvEmptyTitle = binding.tvEmptyTitle
+        tvEmptyBody = binding.tvEmptyBody
+        tvRecentActivityEmpty = binding.tvRecentActivityEmpty
 
-        btnRefreshDashboard = view.findViewById(R.id.btnRefreshDashboard)
-        btnShareSummary = view.findViewById(R.id.btnShareSummary)
+        btnRefreshDashboard = binding.btnRefreshDashboard
+        btnShareSummary = binding.btnShareSummary
 
-        cardOverview = view.findViewById(R.id.cardOverview)
-        cardPending = view.findViewById(R.id.cardPending)
-        cardProgress = view.findViewById(R.id.cardProgress)
-        cardResolved = view.findViewById(R.id.cardResolved)
-        cardHighPriority = view.findViewById(R.id.cardHighPriority)
-        cardToday = view.findViewById(R.id.cardToday)
-        cardMonth = view.findViewById(R.id.cardMonth)
+        cardOverview = binding.cardOverview
+        cardPending = binding.cardPending
+        cardProgress = binding.cardProgress
+        cardResolved = binding.cardResolved
+        cardHighPriority = binding.cardHighPriority
+        cardToday = binding.cardToday
+        cardMonth = binding.cardMonth
 
         setupCharts()
         setupCardActions()
@@ -181,19 +185,21 @@ class HomeFragment : Fragment() {
         loadDashboardData(forceRefresh = false)
     }
 
+    // This removes the live complaint listener when the view is destroyed.
     override fun onDestroyView() {
         super.onDestroyView()
         complaintsListener?.let { complaintsRef.removeEventListener(it) }
         complaintsListener = null
+        _binding = null
     }
 
+    // This sets refresh and share button actions for the dashboard.
     private fun setupActions() {
-        // Premium dashboard interactions: pull to refresh, quick refresh, and summary sharing.
-        swipeRefreshLayout.setOnRefreshListener {
+        binding.swipeRefreshLayout.setOnRefreshListener {
             loadDashboardData(forceRefresh = true)
         }
         btnRefreshDashboard.setOnClickListener {
-            swipeRefreshLayout.isRefreshing = true
+            binding.swipeRefreshLayout.isRefreshing = true
             loadDashboardData(forceRefresh = true)
         }
         btnShareSummary.setOnClickListener {
@@ -201,7 +207,7 @@ class HomeFragment : Fragment() {
         }
     }
 
-    // Load the current viewer context first, then attach the live complaints listener once.
+    // This loads the current user role and then starts the live complaint listener.
     private fun loadDashboardData(forceRefresh: Boolean) {
         val uid = auth.currentUser?.uid ?: return
         if (!forceRefresh) {
@@ -229,6 +235,7 @@ class HomeFragment : Fragment() {
             }
     }
 
+    // This loads the field officer names used in dashboard workload and handler sections.
     private fun loadOfficerDirectory(onComplete: () -> Unit) {
         if (currentRole == "Field Officer") {
             officerDirectory = emptyMap()
@@ -252,6 +259,7 @@ class HomeFragment : Fragment() {
             }
     }
 
+    // This attaches one live complaint listener and keeps only complaints visible to the current role.
     private fun attachComplaintsListener(uid: String) {
         complaintsListener?.let { complaintsRef.removeEventListener(it) }
 
@@ -282,10 +290,12 @@ class HomeFragment : Fragment() {
         complaintsRef.addValueEventListener(complaintsListener as ValueEventListener)
     }
 
+    // This stops the pull-to-refresh spinner after loading is done.
     private fun finishRefreshState() {
-        swipeRefreshLayout.isRefreshing = false
+        binding.swipeRefreshLayout.isRefreshing = false
     }
 
+    // This recalculates ETA values for visible complaints so dashboard numbers stay in sync.
     private fun syncEtaForVisibleComplaints(complaints: List<Complaint>) {
         if (currentRole == "Field Officer") return
 
@@ -295,6 +305,7 @@ class HomeFragment : Fragment() {
         }
     }
 
+    // This fills the dashboard greeting and subtitle based on the logged-in user role.
     private fun bindHeader() {
         val firstName = currentName.trim().split(" ").firstOrNull().orEmpty().ifBlank { getString(R.string.generic_user) }
         val greetingPrefix = when (LocalTime.now().hour) {
@@ -320,28 +331,28 @@ class HomeFragment : Fragment() {
         }
     }
 
+    // This shows or hides the dashboard loading screen.
     private fun showLoading(isLoading: Boolean) {
         loadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
-        swipeRefreshLayout.visibility = if (isLoading) View.GONE else View.VISIBLE
+        binding.swipeRefreshLayout.visibility = if (isLoading) View.GONE else View.VISIBLE
     }
 
+    // This checks whether a complaint should count for the current user's dashboard.
     private fun shouldIncludeComplaint(complaint: Complaint, uid: String): Boolean {
         return when (currentRole) {
             "Super Admin" -> true
             "Department Admin" -> {
-                // Department admins only see complaints that resolve into their own service bucket.
                 ComplaintDataFormatter.resolvedDepartment(complaint) ==
                     ComplaintDataFormatter.normalizeDepartment(currentDepartment)
             }
             "Field Officer" -> complaint.allottedOfficerId == uid
             else -> {
-                // Fallback keeps the dashboard usable even if an older account has missing role text.
                 true
             }
         }
     }
 
-    // Rebuild every dashboard section from the same analytics snapshot so cards and charts stay in sync.
+    // This updates every dashboard card and chart from one shared analytics result.
     private fun bindMetrics() {
         selectedRange = DashboardRange.ALL_TIME
         val metrics = DashboardAnalytics.buildMetrics(
@@ -411,6 +422,7 @@ class HomeFragment : Fragment() {
         bindRecentActivity(metrics.recentActivity)
     }
 
+    // This clears all charts when there is no complaint data to show.
     private fun clearCharts() {
         pieChart.clear()
         barChart.clear()
@@ -420,8 +432,8 @@ class HomeFragment : Fragment() {
         lineChart.invalidate()
     }
 
+    // This makes the summary cards behave like shortcuts into the complaint list.
     private fun setupCardActions() {
-        // Summary cards behave like shortcuts into the complaints screen with pre-applied filters.
         cardOverview.setOnClickListener { openComplaints(range = currentDisplayRange.label) }
         cardPending.setOnClickListener { openComplaints(status = "Pending", range = currentDisplayRange.label) }
         cardProgress.setOnClickListener { openComplaints(status = "In Progress", range = currentDisplayRange.label) }
@@ -433,6 +445,7 @@ class HomeFragment : Fragment() {
         cardMonth.setOnClickListener { openComplaints(range = DashboardRange.THIS_MONTH.label) }
     }
 
+    // This opens the complaint screen with optional pre-applied filters.
     private fun openComplaints(
         status: String? = null,
         priority: String? = null,
@@ -456,9 +469,9 @@ class HomeFragment : Fragment() {
             .selectedItemId = R.id.nav_complaints
     }
 
+    // This shares the current dashboard summary as plain text.
     private fun shareDashboardSummary() {
         val metrics = currentMetrics ?: return
-        // Export/share summary keeps demo output quick without needing PDF generation.
         val shareText = DashboardAnalytics.shareSummaryText(
             metrics = metrics,
             range = currentDisplayRange,
@@ -476,8 +489,8 @@ class HomeFragment : Fragment() {
         )
     }
 
+    // This prepares pie, bar, and line chart behavior used in the dashboard.
     private fun setupCharts() {
-        // Pie-chart drill-down opens complaints by status.
         pieChart.setUsePercentValues(false)
         pieChart.description.isEnabled = false
         pieChart.isDrawHoleEnabled = true
@@ -504,7 +517,6 @@ class HomeFragment : Fragment() {
             override fun onNothingSelected() = Unit
         })
 
-        // Bar-chart drill-down opens complaints by department with shortened mobile labels.
         barChart.description.isEnabled = false
         barChart.legend.isEnabled = false
         barChart.axisRight.isEnabled = false
@@ -533,7 +545,6 @@ class HomeFragment : Fragment() {
             override fun onNothingSelected() = Unit
         })
 
-        // Trend chart stays visual-only for now, while the other charts support drill-down.
         lineChart.description.isEnabled = false
         lineChart.legend.isEnabled = false
         lineChart.axisRight.isEnabled = false
@@ -551,6 +562,7 @@ class HomeFragment : Fragment() {
         }
     }
 
+    // This updates the complaint status pie chart.
     private fun updatePieChart(data: Map<String, Int>) {
         if (data.isEmpty()) {
             pieChart.clear()
@@ -579,6 +591,7 @@ class HomeFragment : Fragment() {
         pieChart.invalidate()
     }
 
+    // This updates the department comparison bar chart.
     private fun updateBarChart(data: Map<String, Int>) {
         if (data.isEmpty()) {
             barChart.clear()
@@ -604,6 +617,7 @@ class HomeFragment : Fragment() {
         barChart.invalidate()
     }
 
+    // This updates the complaint activity trend line chart.
     private fun updateLineChart(labels: List<String>, values: List<Int>) {
         if (labels.isEmpty() || values.isEmpty()) {
             lineChart.clear()
@@ -632,6 +646,7 @@ class HomeFragment : Fragment() {
         lineChart.invalidate()
     }
 
+    // This translates internal role text into the currently selected app language.
     private fun localizedRoleLabel(role: String): String {
         return when (role) {
             "Super Admin" -> getString(R.string.role_super_admin)
@@ -641,7 +656,7 @@ class HomeFragment : Fragment() {
         }
     }
 
-    // Inflate the recent feed dynamically so it stays easy to adjust without introducing another adapter.
+    // This fills the recent activity section at the bottom of the dashboard.
     private fun bindRecentActivity(items: List<DashboardActivityItem>) {
         recentActivityContainer.removeAllViews()
         tvRecentActivityEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE

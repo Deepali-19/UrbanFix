@@ -16,9 +16,10 @@ import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : AppCompatActivity() {
 
+    // Shows splash and routes the user.
     override fun onCreate(savedInstanceState: Bundle?) {
 
-        // 🌙 Restore dark/light mode BEFORE UI loads (IMPORTANT)
+        // Restore theme first.
         val prefs = getSharedPreferences("theme", MODE_PRIVATE)
         val isDark = prefs.getBoolean("dark", false)
         AppLocaleManager.applySavedLocale(this)
@@ -34,7 +35,7 @@ class MainActivity : AppCompatActivity() {
 
         val logo = findViewById<ImageView>(R.id.logo)
 
-        // A subtle scale-in works better for a full-screen splash artwork than the old logo pop.
+        // Small splash animation.
         logo.scaleX = 0.96f
         logo.scaleY = 0.96f
         logo.alpha = 0f
@@ -47,7 +48,7 @@ class MainActivity : AppCompatActivity() {
             .setInterpolator(OvershootInterpolator())
             .start()
 
-        // ⏳ Auto-login check
+        // Open dashboard or login after splash.
         Handler(Looper.getMainLooper()).postDelayed({
 
             val user = FirebaseAuth.getInstance().currentUser

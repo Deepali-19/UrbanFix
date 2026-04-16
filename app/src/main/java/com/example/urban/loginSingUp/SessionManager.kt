@@ -12,6 +12,7 @@ object SessionManager {
     private const val KEY_LAST_ACTIVITY = "last_activity"
     private const val KEY_LAST_BACKGROUND_AT = "last_background_at"
 
+    // Marks login as active.
     fun markAuthenticated(context: Context) {
         context.getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
             .edit()
@@ -20,6 +21,7 @@ object SessionManager {
             .apply()
     }
 
+    // Refreshes the active session time.
     fun refreshActivity(context: Context) {
         context.getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
             .edit()
@@ -28,6 +30,7 @@ object SessionManager {
             .apply()
     }
 
+    // Saves when the app went to background.
     fun markBackgrounded(context: Context) {
         context.getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
             .edit()
@@ -35,6 +38,7 @@ object SessionManager {
             .apply()
     }
 
+    // Checks whether the session expired.
     fun isExpired(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
         val backgroundedAt = prefs.getLong(KEY_LAST_BACKGROUND_AT, 0L)
@@ -47,6 +51,7 @@ object SessionManager {
         return false
     }
 
+    // Clears saved session data.
     fun clear(context: Context) {
         context.getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
             .edit()

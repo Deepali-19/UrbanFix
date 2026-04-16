@@ -11,53 +11,59 @@ import de.hdodenhof.circleimageview.CircleImageView
 
 class FieldOfficerAdapter (
     private val list: ArrayList<FieldOfficer>,
-    private val onClick: (FieldOfficer) -> Unit) :
+    private val onClick: (FieldOfficer) -> Unit
+) :
     RecyclerView.Adapter<FieldOfficerAdapter.ViewHolder>() {
 
-        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+    // This holder keeps the officer item views used by the RecyclerView.
+    inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
 
-            val img = view.findViewById<CircleImageView>(R.id.imgProfile)
-            val name = view.findViewById<TextView>(R.id.tvName)
-            val dept = view.findViewById<TextView>(R.id.tvDepartment)
-            val phone = view.findViewById<TextView>(R.id.tvPhone)
-            val count = view.findViewById<TextView>(R.id.tvCount)
+        val img = view.findViewById<CircleImageView>(R.id.imgProfile)
+        val name = view.findViewById<TextView>(R.id.tvName)
+        val dept = view.findViewById<TextView>(R.id.tvDepartment)
+        val phone = view.findViewById<TextView>(R.id.tvPhone)
+        val count = view.findViewById<TextView>(R.id.tvCount)
+    }
+
+    // This function creates one officer row view for the list.
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_field_officer, parent, false)
+        return ViewHolder(view)
+    }
+
+    // This function tells the RecyclerView how many officers are available to show.
+    override fun getItemCount() = list.size
+
+    // This function fills one officer row with profile and workload details.
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+
+        val officer = list[position]
+        val metaText = when {
+            officer.phone.isNotBlank() -> "Phone: ${officer.phone}"
+            officer.employeeId.isNotBlank() -> "Employee ID: ${officer.employeeId}"
+            officer.city.isNotBlank() -> "City: ${officer.city}"
+            else -> "Details not available"
         }
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_field_officer, parent, false)
-            return ViewHolder(view)
+        holder.name.text = officer.name
+        holder.dept.text = "Dept: ${officer.department}"
+        holder.phone.text = metaText
+        holder.count.text =
+            "Assigned: ${officer.assignedCount} • Active: ${officer.inProgressCount} • Resolved: ${officer.resolvedCount}"
+
+        if (officer.profileImageUrl.isNotEmpty()) {
+            Glide.with(holder.itemView.context)
+                .load(officer.profileImageUrl)
+                .placeholder(R.drawable.users)
+                .error(R.drawable.users)
+                .into(holder.img)
+        } else {
+            holder.img.setImageResource(R.drawable.users)
         }
 
-        override fun getItemCount() = list.size
-
-        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-
-            val officer = list[position]
-            val metaText = when {
-                officer.phone.isNotBlank() -> "Phone: ${officer.phone}"
-                officer.employeeId.isNotBlank() -> "Employee ID: ${officer.employeeId}"
-                officer.city.isNotBlank() -> "City: ${officer.city}"
-                else -> "Details not available"
-            }
-
-            holder.name.text = officer.name
-            holder.dept.text = "Dept: ${officer.department}"
-            holder.phone.text = metaText
-            holder.count.text = "Assigned: ${officer.assignedCount} • Active: ${officer.inProgressCount} • Resolved: ${officer.resolvedCount}"
-
-            if (officer.profileImageUrl.isNotEmpty()) {
-                Glide.with(holder.itemView.context)
-                    .load(officer.profileImageUrl)
-                    .placeholder(R.drawable.users)
-                    .error(R.drawable.users)
-                    .into(holder.img)
-            } else {
-                holder.img.setImageResource(R.drawable.users)
-            }
-
-            holder.itemView.setOnClickListener {
-                onClick(officer)
-            }
+        holder.itemView.setOnClickListener {
+            onClick(officer)
         }
+    }
 }

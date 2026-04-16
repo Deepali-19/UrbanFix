@@ -1,6 +1,6 @@
 package com.example.urban.bottomNavigation.complaint
 
-import com.example.urban.BuildConfig
+import com.example.urban.AppConfig
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,13 +17,14 @@ data class ComplaintAiSuggestionResult(
     val generatedAt: Long
 )
 
+// This object contains only the AI feature logic used to generate complaint resolution suggestions.
 object ComplaintAiSuggestionService {
 
     private val client = OkHttpClient()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     // This tells the UI whether the Gemini feature is ready to use on this device.
-    fun isConfigured(): Boolean = BuildConfig.GEMINI_API_KEY.isNotBlank()
+    fun isConfigured(): Boolean = AppConfig.geminiApiKey.isNotBlank()
 
     // This sends the complaint details to Gemini and returns one practical solution suggestion.
     fun generateSuggestion(
@@ -67,8 +68,8 @@ object ComplaintAiSuggestionService {
                 }
 
                 val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/${BuildConfig.GEMINI_MODEL}:generateContent")
-                    .addHeader("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
+                    .url("https://generativelanguage.googleapis.com/v1beta/models/${AppConfig.geminiModel}:generateContent")
+                    .addHeader("x-goog-api-key", AppConfig.geminiApiKey)
                     .addHeader("Content-Type", "application/json")
                     .post(payload.toString().toRequestBody(jsonMediaType))
                     .build()
