@@ -34,6 +34,9 @@ object ComplaintSnapshotParser {
             etaNotificationSentAt = readLong(snapshot, "etaNotificationSentAt") ?: 0L,
             aiSuggestion = readString(snapshot, "aiSuggestion").orEmpty(),
             aiSuggestionUpdatedAt = readLong(snapshot, "aiSuggestionUpdatedAt") ?: 0L,
+            imageAiGeneratedScore = readDouble(snapshot, "imageAiGeneratedScore") ?: -1.0,
+            imageAiCheckLabel = readString(snapshot, "imageAiCheckLabel").orEmpty(),
+            imageAiCheckedAt = readLong(snapshot, "imageAiCheckedAt") ?: 0L,
             validation = readBoolean(snapshot, "validation") ?: false,
             readByAdmin = readBoolean(snapshot, "readByAdmin") ?: false,
             departmentId = readString(snapshot, "departmentId", "department").orEmpty()

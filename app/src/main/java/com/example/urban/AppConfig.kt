@@ -17,4 +17,10 @@ object AppConfig {
 
     val geminiModel: String
         get() = BuildConfig.GEMINI_MODEL
+
+    val sightengineApiUser: String
+        get() = BuildConfig.SIGHTENGINE_API_USER
+
+    val sightengineApiSecret: String
+        get() = BuildConfig.SIGHTENGINE_API_SECRET
 }

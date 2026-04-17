@@ -3,7 +3,7 @@
         <!-- Dark colors -->
         <item name="colorPrimary">#1E1E1E</item>
         <item name="colorSecondary">#BB86FC</item>
-        <item name="android:statusBarColor">#121212</item>
+        <item name="android:statusBarColor">@color/status_bar_color</item>
         <item name="android:windowBackground">#121212</item>
     </style>
 </resources>

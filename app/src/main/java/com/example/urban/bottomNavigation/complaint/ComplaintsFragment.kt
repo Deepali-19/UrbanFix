@@ -11,6 +11,7 @@ import com.example.urban.databinding.FragmentComplaintsBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
@@ -68,6 +69,9 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
     private var pendingSortFilter: String? = null
     private var pendingRangeFilter: String? = null
     private var pendingComplaintKeys: ArrayList<String>? = null
+    private var complaintsRef: DatabaseReference? = null
+    private var complaintsListener: ValueEventListener? = null
+    private var isViewReady = false
 
     // This starts listening for incoming dashboard filter requests.
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,6 +94,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
     // This prepares the complaint list UI, adapter, filters, and Firebase loading.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         binding = FragmentComplaintsBinding.bind(view)
+        isViewReady = true
         showLoading(true)
 
         binding.rvComplaints.layoutManager = LinearLayoutManager(requireContext())
@@ -152,36 +157,45 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
 
         db.child("Users").child(currentUid).get().addOnSuccessListener { userSnap ->
+            if (!isViewReady || !isAdded) return@addOnSuccessListener
+
             currentRole = userSnap.child("role").value.toString()
             currentDepartment = userSnap.child("department").value.toString()
             adapter.showUnreadIndicator = currentRole != "Field Officer"
 
-            db.child("Complaints")
-                .addValueEventListener(object : ValueEventListener {
+            val ref = db.child("Complaints")
+            complaintsRef = ref
+            complaintsListener = object : ValueEventListener {
 
-                    override fun onDataChange(snapshot: DataSnapshot) {
-                        allComplaints.clear()
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!isViewReady || !isAdded) return
 
-                        for (data in snapshot.children) {
-                            val complaint = ComplaintSnapshotParser.fromSnapshot(data) ?: continue
+                    allComplaints.clear()
 
-                            if (shouldIncludeComplaint(complaint)) {
-                                allComplaints.add(complaint)
-                            }
+                    for (data in snapshot.children) {
+                        val complaint = ComplaintSnapshotParser.fromSnapshot(data) ?: continue
+
+                        if (shouldIncludeComplaint(complaint)) {
+                            allComplaints.add(complaint)
                         }
-
-                        hasLoadedComplaints = true
-                        syncEtaForVisibleComplaints()
-                        updateDepartmentOptions()
-                        applyFilters()
                     }
 
-                    override fun onCancelled(error: DatabaseError) {
+                    hasLoadedComplaints = true
+                    syncEtaForVisibleComplaints()
+                    updateDepartmentOptions()
+                    applyFilters()
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    if (!isViewReady || !isAdded) return
                         showLoading(false)
-                    }
-                })
+                }
+            }
+
+            ref.addValueEventListener(complaintsListener as ValueEventListener)
         }
             .addOnFailureListener {
+                if (!isViewReady || !isAdded) return@addOnFailureListener
                 showLoading(false)
             }
     }
@@ -210,6 +224,8 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
     // This fills the department filter dropdown with translated department names.
     private fun updateDepartmentOptions() {
+        if (!isViewReady || !isAdded) return
+
         val selectedDepartment = binding.actDepartmentFilter.text?.toString().orEmpty()
         val options = arrayListOf(getString(R.string.department_all))
         options.addAll(APP_DEPARTMENTS.map { ComplaintDataFormatter.localizedDepartmentName(requireContext(), it) })
@@ -343,7 +359,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
     // This applies filters that were passed from other screens like dashboard or map.
     private fun applyPendingDashboardFilters() {
-        if (!this::binding.isInitialized) return
+        if (!this::binding.isInitialized || !isViewReady || !isAdded) return
 
         pendingStatusFilter?.let {
             binding.actStatusFilter.setText(localizedStatusOption(it), false)
@@ -377,6 +393,8 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
     // This updates the summary strip and the empty state text.
     private fun updateSummary(complaints: List<Complaint>) {
+        if (!isViewReady || !isAdded) return
+
         val pending = complaints.count { it.status == 0 }
         val progress = complaints.count { it.status == 1 }
         val resolved = complaints.count { it.status == 2 }
@@ -395,6 +413,8 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
     // This shows or hides the loading view while complaints are being prepared.
     private fun showLoading(isLoading: Boolean) {
+        if (!this::binding.isInitialized || !isViewReady) return
+
         binding.complaintsLoadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
         binding.complaintsContentContainer.visibility = if (isLoading) View.GONE else View.VISIBLE
     }
@@ -405,6 +425,8 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         items: List<String>,
         defaultValue: String
     ) {
+        if (!isViewReady || !isAdded) return
+
         val adapter = ArrayAdapter(
             requireContext(),
             android.R.layout.simple_list_item_1,
@@ -480,5 +502,18 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
             "High Priority First" -> getString(R.string.sort_high_priority_first)
             else -> getString(R.string.sort_newest_first)
         }
+    }
+
+    // This clears live listeners when the complaint screen view is removed.
+    override fun onDestroyView() {
+        complaintsRef?.let { ref ->
+            complaintsListener?.let { listener ->
+                ref.removeEventListener(listener)
+            }
+        }
+        complaintsRef = null
+        complaintsListener = null
+        isViewReady = false
+        super.onDestroyView()
     }
 }

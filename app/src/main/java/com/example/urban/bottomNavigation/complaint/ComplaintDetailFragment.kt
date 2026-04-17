@@ -17,7 +17,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
-import com.example.urban.BuildConfig
 import com.example.urban.R
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.firebase.auth.FirebaseAuth
@@ -54,16 +53,20 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
     private lateinit var tvAssignedOfficerValue: TextView
     private lateinit var tvValidationValue: TextView
     private lateinit var tvFeedbackValue: TextView
+    private lateinit var tvImageCheckMeta: TextView
+    private lateinit var tvImageCheckValue: TextView
     private lateinit var tvAiSuggestionMeta: TextView
     private lateinit var tvAiSuggestionValue: TextView
     private lateinit var imgComplaint: ImageView
     private lateinit var btnOpenMap: Button
     private lateinit var btnPreviewImage: Button
     private lateinit var btnNotifyEta: Button
+    private lateinit var btnCheckComplaintImage: Button
     private lateinit var btnGenerateAiSuggestion: Button
 
     private lateinit var assignSection: View
     private lateinit var statusSection: View
+    private lateinit var imageCheckSection: View
     private lateinit var aiSuggestionSection: View
     private lateinit var spOfficer: Spinner
     private lateinit var actPriority: MaterialAutoCompleteTextView
@@ -83,6 +86,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
     private var userDepartment = ""
     private var isComplaintLoaded = false
     private var isRoleLoaded = false
+    private var isCheckingImage = false
     private var isGeneratingAiSuggestion = false
 
     // This prepares the screen, connects all views, and starts loading complaint data.
@@ -109,16 +113,20 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         tvAssignedOfficerValue = view.findViewById(R.id.tvAssignedOfficerValue)
         tvValidationValue = view.findViewById(R.id.tvValidationValue)
         tvFeedbackValue = view.findViewById(R.id.tvFeedbackValue)
+        tvImageCheckMeta = view.findViewById(R.id.tvImageCheckMeta)
+        tvImageCheckValue = view.findViewById(R.id.tvImageCheckValue)
         tvAiSuggestionMeta = view.findViewById(R.id.tvAiSuggestionMeta)
         tvAiSuggestionValue = view.findViewById(R.id.tvAiSuggestionValue)
         imgComplaint = view.findViewById(R.id.imgComplaint)
         btnOpenMap = view.findViewById(R.id.btnOpenMap)
         btnPreviewImage = view.findViewById(R.id.btnPreviewImage)
         btnNotifyEta = view.findViewById(R.id.btnNotifyEta)
+        btnCheckComplaintImage = view.findViewById(R.id.btnCheckComplaintImage)
         btnGenerateAiSuggestion = view.findViewById(R.id.btnGenerateAiSuggestion)
 
         assignSection = view.findViewById(R.id.assignSection)
         statusSection = view.findViewById(R.id.statusSection)
+        imageCheckSection = view.findViewById(R.id.imageCheckSection)
         aiSuggestionSection = view.findViewById(R.id.aiSuggestionSection)
         spOfficer = view.findViewById(R.id.spOfficer)
         actPriority = view.findViewById(R.id.actPriority)
@@ -139,6 +147,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         btnPreviewImage.setOnClickListener { previewComplaintImage() }
         imgComplaint.setOnClickListener { previewComplaintImage() }
         btnNotifyEta.setOnClickListener { notifyEtaToCivilian() }
+        btnCheckComplaintImage.setOnClickListener { checkComplaintImage() }
         btnGenerateAiSuggestion.setOnClickListener { generateAiSuggestion() }
 
         loadComplaint()
@@ -237,6 +246,8 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         } else {
             "Pending verification"
         }
+        tvImageCheckValue.text = imageCheckResultLabel(complaint)
+        tvImageCheckMeta.text = imageCheckMetaLabel(complaint, hasImage)
         tvAiSuggestionValue.text = complaint.aiSuggestion
         tvAiSuggestionMeta.text = aiSuggestionMetaLabel(complaint)
         tvFeedbackValue.text = complaint.feedback.ifBlank { "No field remark yet" }
@@ -286,6 +297,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
 
         preselectAssignedOfficer(complaint.allottedOfficerId)
         updateEtaActionVisibility()
+        updateImageCheckVisibility()
         updateAiSuggestionVisibility()
     }
 
@@ -341,6 +353,15 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             },
             aiSuggestionUpdatedAt = complaint.aiSuggestionUpdatedAt.takeIf { it > 0L }
                 ?: snapshot.readLong("aiSuggestionUpdatedAt")
+                ?: 0L,
+            imageAiGeneratedScore = complaint.imageAiGeneratedScore.takeIf { it >= 0.0 }
+                ?: snapshot.readDouble("imageAiGeneratedScore")
+                ?: -1.0,
+            imageAiCheckLabel = complaint.imageAiCheckLabel.ifBlank {
+                snapshot.readString("imageAiCheckLabel") ?: ""
+            },
+            imageAiCheckedAt = complaint.imageAiCheckedAt.takeIf { it > 0L }
+                ?: snapshot.readLong("imageAiCheckedAt")
                 ?: 0L,
             departmentId = complaint.departmentId.ifBlank {
                 snapshot.readString("departmentId", "department") ?: ""
@@ -674,6 +695,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         }
 
         updateEtaActionVisibility()
+        updateImageCheckVisibility()
         updateAiSuggestionVisibility()
     }
 
@@ -915,6 +937,31 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         btnNotifyEta.visibility = if (canSendEta) View.VISIBLE else View.GONE
     }
 
+    // This controls the visibility and button state for the image authenticity check section.
+    private fun updateImageCheckVisibility() {
+        val complaint = currentComplaint
+        val hasImage = complaint?.images?.firstOrNull()?.isNotBlank() == true
+        val isAllowedRole = userRole == "Super Admin" || userRole == "Department Admin" || userRole == "Field Officer"
+
+        imageCheckSection.visibility = if (complaint == null) View.GONE else View.VISIBLE
+        btnCheckComplaintImage.visibility = if (isAllowedRole && hasImage) View.VISIBLE else View.GONE
+        btnCheckComplaintImage.isEnabled = !isCheckingImage && ComplaintImageAuthenticityService.isConfigured()
+
+        if (complaint == null) return
+
+        if (!hasImage) {
+            tvImageCheckMeta.text = "This complaint does not have an uploaded image to verify."
+            tvImageCheckValue.text = ""
+            return
+        }
+
+        if (!ComplaintImageAuthenticityService.isConfigured() && complaint.imageAiCheckLabel.isBlank()) {
+            tvImageCheckMeta.text = "AI image check is ready in the app, but the local Sightengine keys are not configured yet."
+        } else {
+            tvImageCheckMeta.text = imageCheckMetaLabel(complaint, true)
+        }
+    }
+
     // This controls the visibility and enabled state of the AI suggestion section.
     private fun updateAiSuggestionVisibility() {
         val complaint = currentComplaint
@@ -922,11 +969,36 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
 
         val isAllowedRole = userRole == "Super Admin" || userRole == "Department Admin" || userRole == "Field Officer"
         btnGenerateAiSuggestion.visibility = if (isAllowedRole) View.VISIBLE else View.GONE
-        btnGenerateAiSuggestion.isEnabled = !isGeneratingAiSuggestion && BuildConfig.GEMINI_API_KEY.isNotBlank()
+        btnGenerateAiSuggestion.isEnabled = !isGeneratingAiSuggestion && ComplaintAiSuggestionService.isConfigured()
 
-        if (BuildConfig.GEMINI_API_KEY.isBlank() && complaint != null && complaint.aiSuggestion.isBlank()) {
+        if (!ComplaintAiSuggestionService.isConfigured() && complaint != null && complaint.aiSuggestion.isBlank()) {
             tvAiSuggestionMeta.text = "AI suggestion is ready in the app, but the local Gemini key is not configured yet."
         }
+    }
+
+    // This shows the latest image check result in a simple readable sentence.
+    private fun imageCheckResultLabel(complaint: Complaint): String {
+        if (complaint.imageAiCheckLabel.isBlank()) {
+            return ""
+        }
+
+        val scorePercent = (complaint.imageAiGeneratedScore * 100).coerceAtLeast(0.0)
+        return "${complaint.imageAiCheckLabel} (${String.format(Locale.getDefault(), "%.0f", scorePercent)}% AI score)"
+    }
+
+    // This shows whether the image check was already done or still waiting.
+    private fun imageCheckMetaLabel(complaint: Complaint, hasImage: Boolean): String {
+        if (!hasImage) {
+            return "This complaint does not have an uploaded image to verify."
+        }
+
+        if (complaint.imageAiCheckedAt > 0L) {
+            val formatted = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+                .format(Date(complaint.imageAiCheckedAt))
+            return "Checked on $formatted"
+        }
+
+        return "Tap Check Image to verify whether the uploaded complaint photo looks real or AI-generated."
     }
 
     // This shows either the AI generation date or the helper line for the AI suggestion section.
@@ -944,7 +1016,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         val complaint = currentComplaint ?: return
         val key = complaintKey ?: return
 
-        if (BuildConfig.GEMINI_API_KEY.isBlank()) {
+        if (!ComplaintAiSuggestionService.isConfigured()) {
             Toast.makeText(
                 requireContext(),
                 "Add GEMINI_API_KEY in local secrets.properties first.",
@@ -995,6 +1067,77 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                         tvAiSuggestionMeta.text = error.message ?: "AI suggestion failed"
                         Toast.makeText(requireContext(), error.message ?: "AI suggestion failed", Toast.LENGTH_SHORT).show()
                         updateAiSuggestionVisibility()
+                    }
+            }
+        }
+    }
+
+    // This checks the uploaded complaint image and saves the result on the complaint.
+    private fun checkComplaintImage() {
+        val complaint = currentComplaint ?: return
+        val key = complaintKey ?: return
+        val imageUrl = complaint.images.firstOrNull()?.takeIf { it.isNotBlank() }
+
+        if (imageUrl.isNullOrBlank()) {
+            Toast.makeText(requireContext(), "No complaint image found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (!ComplaintImageAuthenticityService.isConfigured()) {
+            Toast.makeText(
+                requireContext(),
+                "Add SIGHTENGINE_API_USER and SIGHTENGINE_API_SECRET in local secrets.properties first.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        isCheckingImage = true
+        btnCheckComplaintImage.isEnabled = false
+        btnCheckComplaintImage.text = "Checking..."
+        tvImageCheckMeta.text = "Checking whether the uploaded image looks real or AI-generated."
+
+        ComplaintImageAuthenticityService.checkImage(imageUrl) { result ->
+            activity?.runOnUiThread {
+                isCheckingImage = false
+                btnCheckComplaintImage.text = "Check Image"
+                btnCheckComplaintImage.isEnabled = true
+
+                result
+                    .onSuccess { imageResult ->
+                        val updates = mapOf(
+                            "imageAiGeneratedScore" to imageResult.aiGeneratedScore,
+                            "imageAiCheckLabel" to imageResult.label,
+                            "imageAiCheckedAt" to imageResult.checkedAt
+                        )
+
+                        database.child("Complaints")
+                            .child(key)
+                            .updateChildren(updates)
+                            .addOnSuccessListener {
+                                val updatedComplaint = complaint.copy(
+                                    imageAiGeneratedScore = imageResult.aiGeneratedScore,
+                                    imageAiCheckLabel = imageResult.label,
+                                    imageAiCheckedAt = imageResult.checkedAt
+                                ).also {
+                                    it.firebaseKey = complaint.firebaseKey
+                                }
+
+                                currentComplaint = updatedComplaint
+                                tvImageCheckValue.text = imageCheckResultLabel(updatedComplaint)
+                                tvImageCheckMeta.text = imageCheckMetaLabel(updatedComplaint, true)
+                                updateImageCheckVisibility()
+                                Toast.makeText(requireContext(), "Image check completed", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { error ->
+                                tvImageCheckMeta.text = error.message ?: "Failed to save image check"
+                                Toast.makeText(requireContext(), error.message ?: "Failed to save image check", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                    .onFailure { error ->
+                        tvImageCheckMeta.text = error.message ?: "Image check failed"
+                        Toast.makeText(requireContext(), error.message ?: "Image check failed", Toast.LENGTH_SHORT).show()
+                        updateImageCheckVisibility()
                     }
             }
         }

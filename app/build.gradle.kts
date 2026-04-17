@@ -45,6 +45,8 @@ val appwriteProjectId = configValue("APPWRITE_PROJECT_ID")
 val appwriteBucketId = configValue("APPWRITE_BUCKET_ID")
 val geminiApiKey = configValue("GEMINI_API_KEY")
 val geminiModel = configValue("GEMINI_MODEL", "gemini-2.5-flash")
+val sightengineApiUser = configValue("SIGHTENGINE_API_USER")
+val sightengineApiSecret = configValue("SIGHTENGINE_API_SECRET")
 
 android {
     namespace = "com.example.urban"
@@ -67,6 +69,8 @@ android {
         buildConfigField("String", "APPWRITE_BUCKET_ID", quoted(appwriteBucketId))
         buildConfigField("String", "GEMINI_API_KEY", quoted(geminiApiKey))
         buildConfigField("String", "GEMINI_MODEL", quoted(geminiModel))
+        buildConfigField("String", "SIGHTENGINE_API_USER", quoted(sightengineApiUser))
+        buildConfigField("String", "SIGHTENGINE_API_SECRET", quoted(sightengineApiSecret))
     }
     packaging {
         resources {
