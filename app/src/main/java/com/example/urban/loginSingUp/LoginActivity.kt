@@ -1,6 +1,7 @@
 package com.example.urban.loginSingUp
 
 import android.content.Intent
+import androidx.core.content.ContextCompat
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.widget.Toast
@@ -14,6 +15,13 @@ import com.example.urban.databinding.DialogForgotPasswordBinding
 import com.google.firebase.auth.FirebaseAuth
 
 class LoginActivity : AppCompatActivity() {
+
+    companion object {
+        private const val PREF_LOGIN = "login_prefs"
+        private const val KEY_SAVED_EMAIL = "saved_email"
+        private const val KEY_SAVED_PASSWORD = "saved_password"
+        private const val KEY_REMEMBER_ME = "remember_me"
+    }
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var auth: FirebaseAuth
@@ -36,12 +44,14 @@ class LoginActivity : AppCompatActivity() {
         }
 
         // Restore remembered email.
-        val prefs = getSharedPreferences("login_prefs", MODE_PRIVATE)
-        val savedEmail = prefs.getString("saved_email", "")
-        val rememberMe = prefs.getBoolean("remember_me", false)
+        val prefs = getSharedPreferences(PREF_LOGIN, MODE_PRIVATE)
+        val savedEmail = prefs.getString(KEY_SAVED_EMAIL, "")
+        val savedPassword = prefs.getString(KEY_SAVED_PASSWORD, "")
+        val rememberMe = prefs.getBoolean(KEY_REMEMBER_ME, false)
 
         if (rememberMe && !savedEmail.isNullOrEmpty()) {
             binding.tilEmail.editText!!.setText(savedEmail)
+            binding.tilPassword.editText!!.setText(savedPassword.orEmpty())
             binding.cbRemember.isChecked = true
         }
 
@@ -67,14 +77,16 @@ class LoginActivity : AppCompatActivity() {
         }
 
         // Save or clear Remember Me.
-        val prefs = getSharedPreferences("login_prefs", MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREF_LOGIN, MODE_PRIVATE)
         val editor = prefs.edit()
         if (binding.cbRemember.isChecked) {
-            editor.putString("saved_email", email)
-            editor.putBoolean("remember_me", true)
+            editor.putString(KEY_SAVED_EMAIL, email)
+            editor.putString(KEY_SAVED_PASSWORD, password)
+            editor.putBoolean(KEY_REMEMBER_ME, true)
         } else {
-            editor.remove("saved_email")
-            editor.putBoolean("remember_me", false)
+            editor.remove(KEY_SAVED_EMAIL)
+            editor.remove(KEY_SAVED_PASSWORD)
+            editor.putBoolean(KEY_REMEMBER_ME, false)
         }
         editor.apply()
 
@@ -107,8 +119,14 @@ class LoginActivity : AppCompatActivity() {
             .create()
 
         dialog.setOnShowListener {
+            val positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            val negativeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
+
+            positiveButton.setTextColor(ContextCompat.getColor(this, R.color.profile_header_end))
+            negativeButton.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+
             // Keep the dialog open on invalid input.
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            positiveButton.setOnClickListener {
                 val email = dialogBinding.tilForgotEmail.editText!!.text.toString().trim()
 
                 if (email.isEmpty()) {

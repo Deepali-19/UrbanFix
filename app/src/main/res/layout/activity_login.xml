@@ -177,11 +177,12 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <CheckBox
+                    <com.google.android.material.checkbox.MaterialCheckBox
                         android:id="@+id/cbRemember"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:buttonTint="@color/remember_me_checkbox_tint"
                         android:text="@string/auth_remember_me"
                         android:textColor="#344054" />
 

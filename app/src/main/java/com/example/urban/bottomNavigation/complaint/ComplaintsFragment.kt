@@ -87,6 +87,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
             pendingSortFilter = bundle.getString(KEY_SORT)
             pendingRangeFilter = bundle.getString(KEY_RANGE)
             pendingComplaintKeys = bundle.getStringArrayList(KEY_COMPLAINT_KEYS)
+            parentFragmentManager.clearFragmentResult(REQUEST_KEY_FILTERS)
             applyPendingDashboardFilters()
         }
     }
@@ -172,7 +173,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
                     allComplaints.clear()
 
-                    for (data in snapshot.children) {
+                    for (data in ComplaintSnapshotParser.complaintSnapshots(snapshot)) {
                         val complaint = ComplaintSnapshotParser.fromSnapshot(data) ?: continue
 
                         if (shouldIncludeComplaint(complaint)) {
@@ -217,8 +218,14 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
         if (currentRole == "Field Officer") return
 
         val etaUpdates = ComplaintEtaManager.buildEtaUpdates(allComplaints)
-        etaUpdates.forEach { (complaintKey, updates) ->
-            db.child("Complaints").child(complaintKey).updateChildren(updates)
+        etaUpdates.forEach { (complaintPathOrKey, updates) ->
+            if (complaintPathOrKey.startsWith("/")) {
+                FirebaseDatabase.getInstance()
+                    .getReference(complaintPathOrKey.trimStart('/'))
+                    .updateChildren(updates)
+            } else {
+                db.child("Complaints").child(complaintPathOrKey).updateChildren(updates)
+            }
         }
     }
 

@@ -163,7 +163,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Directions"
-                android:textAllCaps="false" />
+                android:textAllCaps="false"
+                android:textColor="#0B4CC2" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSheetList"
@@ -172,7 +173,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:text="View List"
-                android:textAllCaps="false" />
+                android:textAllCaps="false"
+                android:textColor="#0B4CC2" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSheetDetail"

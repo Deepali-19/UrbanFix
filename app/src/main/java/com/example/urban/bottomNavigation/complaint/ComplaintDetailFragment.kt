@@ -88,9 +88,11 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
     private var isRoleLoaded = false
     private var isCheckingImage = false
     private var isGeneratingAiSuggestion = false
+    private var isViewReady = false
 
     // This prepares the screen, connects all views, and starts loading complaint data.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        isViewReady = true
         database = FirebaseDatabase.getInstance().reference
 
         loadingContainer = view.findViewById(R.id.detailLoadingContainer)
@@ -183,24 +185,110 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .child(key)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!canUseUi()) return
                     val complaint = ComplaintSnapshotParser.fromSnapshot(snapshot)
-                    if (complaint == null) {
-                        isComplaintLoaded = true
-                        updateLoadingState()
-                        Toast.makeText(requireContext(), "Complaint not found", Toast.LENGTH_SHORT).show()
+                    if (complaint != null) {
+                        showComplaint(snapshot, complaint)
                         return
                     }
 
-                    val hydratedComplaint = hydrateComplaint(snapshot, complaint)
-                    hydratedComplaint.firebaseKey = snapshot.key.orEmpty()
-                    currentComplaint = hydratedComplaint
-                    bindComplaint(hydratedComplaint)
-                    maybeMarkComplaintAsRead(hydratedComplaint)
-                    isComplaintLoaded = true
-                    updateLoadingState()
+                    loadComplaintByDisplayId(key)
                 }
 
                 override fun onCancelled(error: DatabaseError) {
+                    if (!canUseUi()) return
+                    isComplaintLoaded = true
+                    updateLoadingState()
+                }
+            })
+    }
+
+    // This binds complaint data after it is found by Firebase key.
+    private fun showComplaint(snapshot: DataSnapshot, complaint: Complaint) {
+        val hydratedComplaint = hydrateComplaint(snapshot, complaint)
+        hydratedComplaint.firebaseKey = snapshot.key.orEmpty()
+        hydratedComplaint.firebasePath = snapshot.ref.path.toString()
+        currentComplaint = hydratedComplaint
+        bindComplaint(hydratedComplaint)
+        maybeMarkComplaintAsRead(hydratedComplaint)
+        isComplaintLoaded = true
+        updateLoadingState()
+    }
+
+    // This tries a second lookup using complaint id fields when the alert stored a display id instead of the Firebase key.
+    private fun loadComplaintByDisplayId(displayId: String) {
+        val complaintRoot = database.child("Complaints")
+        val candidateFields = listOf("complaintId", "complaintNo", "complaintNumber", "id")
+        queryComplaintByField(complaintRoot, displayId, candidateFields, 0)
+    }
+
+    // This checks a list of complaint id fields one by one.
+    private fun queryComplaintByField(
+        complaintRoot: DatabaseReference,
+        displayId: String,
+        candidateFields: List<String>,
+        index: Int
+    ) {
+        if (index >= candidateFields.size) {
+            scanComplaintsForAnyMatchingId(displayId)
+            return
+        }
+
+        complaintRoot.orderByChild(candidateFields[index])
+            .equalTo(displayId)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!canUseUi()) return
+
+                    val matchedSnapshot = snapshot.children.firstOrNull()
+                    val complaint = matchedSnapshot?.let { ComplaintSnapshotParser.fromSnapshot(it) }
+                    if (matchedSnapshot != null && complaint != null) {
+                        showComplaint(matchedSnapshot, complaint)
+                        return
+                    }
+
+                    queryComplaintByField(complaintRoot, displayId, candidateFields, index + 1)
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    if (!canUseUi()) return
+                    queryComplaintByField(complaintRoot, displayId, candidateFields, index + 1)
+                }
+            })
+    }
+
+    // This does one full scan as the last fallback so old or mixed records can still open.
+    private fun scanComplaintsForAnyMatchingId(displayId: String) {
+        database.child("Complaints")
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!canUseUi()) return
+
+                    val matchedSnapshot = ComplaintSnapshotParser.complaintSnapshots(snapshot).firstOrNull { complaintSnapshot ->
+                        val firebaseKey = complaintSnapshot.key.orEmpty()
+                        if (firebaseKey == displayId) return@firstOrNull true
+
+                        val possibleIds = listOf(
+                            complaintSnapshot.readString("complaintId", "complaintNo", "complaintNumber", "id"),
+                            complaintSnapshot.readNestedString("complaint", "id")
+                        )
+
+                        possibleIds.any { it == displayId }
+                    }
+
+                    val complaint = matchedSnapshot?.let { ComplaintSnapshotParser.fromSnapshot(it) }
+                    if (matchedSnapshot != null && complaint != null) {
+                        showComplaint(matchedSnapshot, complaint)
+                        return
+                    }
+
+                    isComplaintLoaded = true
+                    updateLoadingState()
+                    Toast.makeText(requireContext(), "Complaint not found", Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    if (!canUseUi()) return
                     isComplaintLoaded = true
                     updateLoadingState()
                 }
@@ -329,25 +417,37 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
 
         return complaint.copy(
             complaintId = complaint.complaintId.ifBlank {
-                snapshot.readString("complaintId", "id") ?: ""
+                snapshot.readString("complaintId", "complaintNo", "complaintNumber", "id") ?: ""
             },
             issueType = complaint.issueType.ifBlank {
-                snapshot.readString("issueType", "category", "issue") ?: ""
+                snapshot.readString("issueType", "category", "issue", "type") ?: ""
             },
             title = complaint.title.ifBlank {
-                snapshot.readString("title", "subject") ?: ""
+                snapshot.readString("title", "subject", "headline") ?: ""
             },
             description = complaint.description.ifBlank {
                 snapshot.readString("description", "details") ?: ""
             },
             civilianId = complaint.civilianId.ifBlank {
-                snapshot.readString("civilianId", "userId", "citizenId") ?: ""
+                snapshot.readString("civilianId", "userId", "citizenId", "uid", "ownerId", "reportedBy", "createdBy")
+                    ?: snapshot.readNestedString("user", "uid")
+                    ?: snapshot.readNestedString("user", "id")
+                    ?: snapshot.readNestedString("civilian", "uid")
+                    ?: snapshot.readNestedString("civilian", "id")
+                    ?: snapshot.readNestedString("citizen", "uid")
+                    ?: snapshot.readNestedString("citizen", "id")
+                    ?: ""
             },
             phone = phone,
             location = location,
             latitude = latitude,
             longitude = longitude,
             timestamp = timestamp,
+            images = if (complaint.images.isNotEmpty()) {
+                complaint.images
+            } else {
+                snapshot.readComplaintImages()
+            },
             aiSuggestion = complaint.aiSuggestion.ifBlank {
                 snapshot.readString("aiSuggestion") ?: ""
             },
@@ -364,7 +464,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                 ?: snapshot.readLong("imageAiCheckedAt")
                 ?: 0L,
             departmentId = complaint.departmentId.ifBlank {
-                snapshot.readString("departmentId", "department") ?: ""
+                snapshot.readString("departmentId", "department", "dept", "departmentName", "selectedDepartment") ?: ""
             }
         )
     }
@@ -374,6 +474,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         database.child("Users").child(civilianId)
             .get()
             .addOnSuccessListener { snapshot ->
+                if (!canUseUi()) return@addOnSuccessListener
                 val fallbackName = snapshot.readString("name", "username", "fullName", "displayName")
                 val fallbackPhone = snapshot.readLong("phone", "mobile", "contact", "citizenPhone")
 
@@ -395,6 +496,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                 }
             }
             .addOnFailureListener {
+                if (!canUseUi()) return@addOnFailureListener
                 tvCitizenNameValue.text = "Not available"
             }
     }
@@ -447,6 +549,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .child(key)
             .updateChildren(update)
             .addOnSuccessListener {
+                if (!canUseUi()) return@addOnSuccessListener
                 val updatedComplaint = complaint.copy(
                     status = status,
                     feedback = remark,
@@ -469,6 +572,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                 }
             }
             .addOnFailureListener { error ->
+                if (!canUseUi()) return@addOnFailureListener
                 Toast.makeText(requireContext(), error.message ?: "Update failed", Toast.LENGTH_SHORT).show()
             }
     }
@@ -512,10 +616,11 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         updates["readByAdmin"] = true
         updates["updatedAt"] = now
 
-        database.child("Complaints")
-            .child(key)
-            .updateChildren(updates)
+        val complaintRef = complaintNodeRef(complaint) ?: return
+
+        complaintRef.updateChildren(updates)
             .addOnSuccessListener {
+                if (!canUseUi()) return@addOnSuccessListener
                 val updatedComplaint = complaint.copy(
                     priority = updates["priority"] as? Int ?: complaint.priority,
                     validation = updates["validation"] as? Boolean ?: complaint.validation,
@@ -525,6 +630,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                     updatedAt = now
                 ).also {
                     it.firebaseKey = complaint.firebaseKey
+                    it.firebasePath = complaint.firebasePath
                 }
 
                 refreshEtaForComplaint(
@@ -541,6 +647,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                 }
             }
             .addOnFailureListener { error ->
+                if (!canUseUi()) return@addOnFailureListener
                 Toast.makeText(requireContext(), error.message ?: "Save failed", Toast.LENGTH_SHORT).show()
             }
     }
@@ -624,18 +731,20 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .push()
             .setValue(payload)
             .addOnSuccessListener {
-                database.child("Complaints")
-                    .child(key)
-                    .child("etaNotificationSentAt")
-                    .setValue(now)
+                if (!canUseUi()) return@addOnSuccessListener
+                complaintNodeRef(complaint)
+                    ?.child("etaNotificationSentAt")
+                    ?.setValue(now)
 
                 currentComplaint = complaint.copy(etaNotificationSentAt = now).also {
                     it.firebaseKey = complaint.firebaseKey
+                    it.firebasePath = complaint.firebasePath
                 }
                 tvEtaNotifyStatus.text = etaNotifyStatusLabel(currentComplaint ?: complaint)
                 Toast.makeText(requireContext(), "ETA notification sent to civilian app", Toast.LENGTH_SHORT).show()
             }
             .addOnFailureListener { error ->
+                if (!canUseUi()) return@addOnFailureListener
                 Toast.makeText(requireContext(), error.message ?: "Failed to notify civilian", Toast.LENGTH_SHORT).show()
             }
     }
@@ -661,6 +770,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         database.child("Users").child(uid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!canUseUi()) return
                     userRole = snapshot.child("role").value.toString()
                     userDepartment = snapshot.child("department").value.toString()
 
@@ -671,6 +781,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                 }
 
                 override fun onCancelled(error: DatabaseError) {
+                    if (!canUseUi()) return
                     isRoleLoaded = true
                     updateLoadingState()
                 }
@@ -706,6 +817,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .equalTo("Field Officer")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!canUseUi()) return
                     officerNames.clear()
                     officerIds.clear()
 
@@ -732,6 +844,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             .equalTo(department)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!canUseUi()) return
                     officerNames.clear()
                     officerIds.clear()
 
@@ -785,6 +898,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         database.child("Users").child(officerId)
             .get()
             .addOnSuccessListener { snapshot ->
+                if (!canUseUi()) return@addOnSuccessListener
                 val name = snapshot.child("name").value?.toString().orEmpty()
                 val department = snapshot.child("department").value?.toString().orEmpty()
 
@@ -795,6 +909,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                 }
             }
             .addOnFailureListener {
+                if (!canUseUi()) return@addOnFailureListener
                 tvAssignedOfficerValue.text = "Assigned officer"
             }
     }
@@ -864,6 +979,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
         database.child("Complaints")
             .get()
             .addOnSuccessListener { snapshot ->
+                if (!canUseUi()) return@addOnSuccessListener
                 val openDepartmentLoad = snapshot.children
                     .mapNotNull { item ->
                         ComplaintSnapshotParser.fromSnapshot(item)
@@ -910,6 +1026,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                         )
                     )
                     .addOnSuccessListener {
+                        if (!canUseUi()) return@addOnSuccessListener
                         currentComplaint = refreshedComplaint
                         tvEtaValue.text = ComplaintEtaManager.etaDisplayLabel(refreshedComplaint)
                         tvEtaReasonValue.text = ComplaintEtaManager.etaReasonLabel(refreshedComplaint)
@@ -918,10 +1035,12 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                         onComplete(refreshedComplaint, true)
                     }
                     .addOnFailureListener {
+                        if (!canUseUi()) return@addOnFailureListener
                         onComplete(baseComplaint, false)
                     }
             }
             .addOnFailureListener {
+                if (!canUseUi()) return@addOnFailureListener
                 onComplete(baseComplaint, false)
             }
     }
@@ -1032,6 +1151,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
 
         ComplaintAiSuggestionService.generateSuggestion(complaint) { result ->
             activity?.runOnUiThread {
+                if (!canUseUi()) return@runOnUiThread
                 isGeneratingAiSuggestion = false
                 btnGenerateAiSuggestion.text = "Generate Suggestion"
                 btnGenerateAiSuggestion.isEnabled = true
@@ -1042,15 +1162,22 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                             "aiSuggestion" to aiResult.suggestion,
                             "aiSuggestionUpdatedAt" to aiResult.generatedAt
                         )
-                        database.child("Complaints")
-                            .child(key)
-                            .updateChildren(updates)
+                        val complaintRef = complaintNodeRef(complaint)
+                        if (complaintRef == null) {
+                            tvAiSuggestionMeta.text = "Complaint path not found"
+                            Toast.makeText(requireContext(), "Complaint path not found", Toast.LENGTH_SHORT).show()
+                            return@onSuccess
+                        }
+
+                        complaintRef.updateChildren(updates)
                             .addOnSuccessListener {
+                                if (!canUseUi()) return@addOnSuccessListener
                                 val updatedComplaint = complaint.copy(
                                     aiSuggestion = aiResult.suggestion,
                                     aiSuggestionUpdatedAt = aiResult.generatedAt
                                 ).also {
                                     it.firebaseKey = complaint.firebaseKey
+                                    it.firebasePath = complaint.firebasePath
                                 }
                                 currentComplaint = updatedComplaint
                                 tvAiSuggestionValue.text = aiResult.suggestion
@@ -1059,11 +1186,13 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                                 Toast.makeText(requireContext(), "AI suggestion generated", Toast.LENGTH_SHORT).show()
                             }
                             .addOnFailureListener { error ->
+                                if (!canUseUi()) return@addOnFailureListener
                                 tvAiSuggestionMeta.text = error.message ?: "Failed to save AI suggestion"
                                 Toast.makeText(requireContext(), error.message ?: "Failed to save AI suggestion", Toast.LENGTH_SHORT).show()
                             }
                     }
                     .onFailure { error ->
+                        if (!canUseUi()) return@onFailure
                         tvAiSuggestionMeta.text = error.message ?: "AI suggestion failed"
                         Toast.makeText(requireContext(), error.message ?: "AI suggestion failed", Toast.LENGTH_SHORT).show()
                         updateAiSuggestionVisibility()
@@ -1099,6 +1228,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
 
         ComplaintImageAuthenticityService.checkImage(imageUrl) { result ->
             activity?.runOnUiThread {
+                if (!canUseUi()) return@runOnUiThread
                 isCheckingImage = false
                 btnCheckComplaintImage.text = "Check Image"
                 btnCheckComplaintImage.isEnabled = true
@@ -1111,16 +1241,23 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                             "imageAiCheckedAt" to imageResult.checkedAt
                         )
 
-                        database.child("Complaints")
-                            .child(key)
-                            .updateChildren(updates)
+                        val complaintRef = complaintNodeRef(complaint)
+                        if (complaintRef == null) {
+                            tvImageCheckMeta.text = "Complaint path not found"
+                            Toast.makeText(requireContext(), "Complaint path not found", Toast.LENGTH_SHORT).show()
+                            return@onSuccess
+                        }
+
+                        complaintRef.updateChildren(updates)
                             .addOnSuccessListener {
+                                if (!canUseUi()) return@addOnSuccessListener
                                 val updatedComplaint = complaint.copy(
                                     imageAiGeneratedScore = imageResult.aiGeneratedScore,
                                     imageAiCheckLabel = imageResult.label,
                                     imageAiCheckedAt = imageResult.checkedAt
                                 ).also {
                                     it.firebaseKey = complaint.firebaseKey
+                                    it.firebasePath = complaint.firebasePath
                                 }
 
                                 currentComplaint = updatedComplaint
@@ -1130,11 +1267,13 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                                 Toast.makeText(requireContext(), "Image check completed", Toast.LENGTH_SHORT).show()
                             }
                             .addOnFailureListener { error ->
+                                if (!canUseUi()) return@addOnFailureListener
                                 tvImageCheckMeta.text = error.message ?: "Failed to save image check"
                                 Toast.makeText(requireContext(), error.message ?: "Failed to save image check", Toast.LENGTH_SHORT).show()
                             }
                     }
                     .onFailure { error ->
+                        if (!canUseUi()) return@onFailure
                         tvImageCheckMeta.text = error.message ?: "Image check failed"
                         Toast.makeText(requireContext(), error.message ?: "Image check failed", Toast.LENGTH_SHORT).show()
                         updateImageCheckVisibility()
@@ -1163,6 +1302,73 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                 return value
             }
         }
+        return null
+    }
+
+    // This helper reads complaint photos from list-style or single URL fields.
+    private fun DataSnapshot.readComplaintImages(): ArrayList<String> {
+        val listKeys = listOf("images", "imageUrls", "photoUrls", "mediaUrls", "photos", "media", "attachments")
+        listKeys.forEach { key ->
+            val node = child(key)
+            if (!node.exists()) return@forEach
+
+            val items = arrayListOf<String>()
+            if (node.hasChildren()) {
+                node.children.forEach { item ->
+                    val value = item.readImageValue()
+                    if (!value.isNullOrBlank()) {
+                        items.add(value)
+                    }
+                }
+            } else {
+                val singleValue = node.readImageValue()
+                if (!singleValue.isNullOrBlank()) {
+                    items.add(singleValue)
+                }
+            }
+
+            if (items.isNotEmpty()) {
+                return items
+            }
+        }
+
+        val singleImage = readString(
+            "image",
+            "imageUrl",
+            "imageUri",
+            "photo",
+            "photoUrl",
+            "mediaUrl",
+            "uploadedImageUrl",
+            "attachmentUrl",
+            "fileUrl",
+            "downloadUrl"
+        )
+
+        return if (!singleImage.isNullOrBlank()) {
+            arrayListOf(singleImage)
+        } else {
+            arrayListOf()
+        }
+    }
+
+    // This helper reads one image url from a direct string or nested image object.
+    private fun DataSnapshot.readImageValue(): String? {
+        if (!hasChildren()) {
+            val directValue = value?.toString()?.trim().orEmpty()
+            if (directValue.isNotBlank() && directValue.lowercase(Locale.getDefault()) != "null") {
+                return directValue
+            }
+        }
+
+        val nestedKeys = listOf("url", "uri", "src", "imageUrl", "photoUrl", "fileUrl", "downloadUrl")
+        nestedKeys.forEach { key ->
+            val nestedValue = child(key).value?.toString()?.trim().orEmpty()
+            if (nestedValue.isNotBlank() && nestedValue.lowercase(Locale.getDefault()) != "null") {
+                return nestedValue
+            }
+        }
+
         return null
     }
 
@@ -1223,6 +1429,30 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             else -> null
         }
         return parsed?.takeIf { it != 0.0 }
+    }
+
+    // This returns the exact Firebase node for the current complaint, even if it is nested under civilian id.
+    private fun complaintNodeRef(complaint: Complaint): DatabaseReference? {
+        val storedPath = complaint.firebasePath.trim()
+        if (storedPath.isNotBlank()) {
+            return FirebaseDatabase.getInstance()
+                .getReference(storedPath.trimStart('/'))
+        }
+
+        val fallbackKey = complaint.firebaseKey.ifBlank { complaint.complaintId }.trim()
+        if (fallbackKey.isBlank()) return null
+        return database.child("Complaints").child(fallbackKey)
+    }
+
+    // Clears the ready flag when the detail view goes away.
+    override fun onDestroyView() {
+        isViewReady = false
+        super.onDestroyView()
+    }
+
+    // Returns true only when this screen is still attached and safe to update.
+    private fun canUseUi(): Boolean {
+        return isAdded && isViewReady
     }
 
     companion object {

@@ -8,21 +8,22 @@ object ComplaintSnapshotParser {
     // This creates a Complaint object from Firebase data, even when old records use mixed keys or types.
     fun fromSnapshot(snapshot: DataSnapshot): Complaint? {
         if (!snapshot.exists()) return null
+        if (!isComplaintNode(snapshot)) return null
 
         val complaint = Complaint(
-            complaintId = readString(snapshot, "complaintId", "id").orEmpty(),
-            issueType = readString(snapshot, "issueType", "category", "issue").orEmpty(),
+            complaintId = readString(snapshot, "complaintId", "complaintNo", "complaintNumber", "id").orEmpty(),
+            issueType = readString(snapshot, "issueType", "category", "issue", "type").orEmpty(),
             status = readInt(snapshot, "status") ?: 0,
-            title = readString(snapshot, "title", "subject").orEmpty(),
+            title = readString(snapshot, "title", "subject", "headline").orEmpty(),
             description = readString(snapshot, "description", "details").orEmpty(),
-            civilianId = readString(snapshot, "civilianId", "userId", "citizenId").orEmpty(),
+            civilianId = readCivilianId(snapshot).orEmpty(),
             phone = readLong(snapshot, "phone", "mobile", "contact", "citizenPhone") ?: 0L,
             location = readLocation(snapshot).orEmpty(),
             latitude = readLatitude(snapshot) ?: 0.0,
             longitude = readLongitude(snapshot) ?: 0.0,
-            allottedOfficerId = readString(snapshot, "allottedOfficerId", "assignedOfficerId", "fieldOfficerId").orEmpty(),
+            allottedOfficerId = readAssignedOfficerId(snapshot).orEmpty(),
             feedback = readString(snapshot, "feedback", "remark", "remarks", "comment").orEmpty(),
-            images = readStringList(snapshot, "images"),
+            images = readComplaintImages(snapshot),
             timestamp = readLong(snapshot, "timestamp", "timeStamp", "createdAt", "reportedOn") ?: 0L,
             updatedAt = readLong(snapshot, "updatedAt") ?: 0L,
             resolvedAt = readLong(snapshot, "resolvedAt") ?: 0L,
@@ -39,11 +40,68 @@ object ComplaintSnapshotParser {
             imageAiCheckedAt = readLong(snapshot, "imageAiCheckedAt") ?: 0L,
             validation = readBoolean(snapshot, "validation") ?: false,
             readByAdmin = readBoolean(snapshot, "readByAdmin") ?: false,
-            departmentId = readString(snapshot, "departmentId", "department").orEmpty()
+            departmentId = readString(snapshot, "departmentId", "department", "dept", "departmentName", "selectedDepartment").orEmpty()
         )
 
         complaint.firebaseKey = snapshot.key.orEmpty()
+        complaint.firebasePath = snapshot.ref.path.toString()
         return complaint
+    }
+
+    // This walks through flat or nested complaint trees and returns only real complaint nodes.
+    fun complaintSnapshots(root: DataSnapshot): List<DataSnapshot> {
+        val complaintNodes = mutableListOf<DataSnapshot>()
+        collectComplaintSnapshots(root, complaintNodes)
+        return complaintNodes
+    }
+
+    // This recursively scans the tree until it finds valid complaint records.
+    private fun collectComplaintSnapshots(node: DataSnapshot, complaintNodes: MutableList<DataSnapshot>) {
+        if (!node.exists()) return
+
+        if (isComplaintNode(node)) {
+            complaintNodes.add(node)
+            return
+        }
+
+        node.children.forEach { child ->
+            collectComplaintSnapshots(child, complaintNodes)
+        }
+    }
+
+    // This checks whether the current snapshot itself is a complaint record or just a parent container.
+    private fun isComplaintNode(snapshot: DataSnapshot): Boolean {
+        val directKeys = listOf(
+            "complaintId",
+            "complaintNo",
+            "complaintNumber",
+            "id",
+            "title",
+            "subject",
+            "headline",
+            "description",
+            "details",
+            "issueType",
+            "category",
+            "issue",
+            "type",
+            "status",
+            "civilianId",
+            "userId",
+            "citizenId",
+            "uid",
+            "ownerId",
+            "reportedBy",
+            "createdBy",
+            "images",
+            "image",
+            "imageUrl",
+            "uploadedImageUrl",
+            "timestamp",
+            "timeStamp"
+        )
+
+        return directKeys.any { snapshot.child(it).exists() }
     }
 
     // This reads the best available location text from the complaint snapshot.
@@ -86,6 +144,34 @@ object ComplaintSnapshotParser {
             }
         }
         return null
+    }
+
+    // This reads the complaint owner id from direct or nested keys.
+    private fun readCivilianId(snapshot: DataSnapshot): String? {
+        return readString(snapshot, "civilianId", "userId", "citizenId", "uid", "ownerId", "reportedBy", "createdBy")
+            ?: readNestedString(snapshot, "user", "uid")
+            ?: readNestedString(snapshot, "user", "id")
+            ?: readNestedString(snapshot, "civilian", "uid")
+            ?: readNestedString(snapshot, "civilian", "id")
+            ?: readNestedString(snapshot, "citizen", "uid")
+            ?: readNestedString(snapshot, "citizen", "id")
+    }
+
+    // This reads the assigned officer id from direct or nested keys.
+    private fun readAssignedOfficerId(snapshot: DataSnapshot): String? {
+        return readString(
+            snapshot,
+            "allottedOfficerId",
+            "allotedOfficerId",
+            "assignedOfficerId",
+            "fieldOfficerId",
+            "officerId",
+            "assignedTo"
+        )
+            ?: readNestedString(snapshot, "assignedOfficer", "uid")
+            ?: readNestedString(snapshot, "assignedOfficer", "id")
+            ?: readNestedString(snapshot, "officer", "uid")
+            ?: readNestedString(snapshot, "officer", "id")
     }
 
     // This reads a number as Long from a list of possible Firebase keys.
@@ -181,10 +267,7 @@ object ComplaintSnapshotParser {
     }
 
     // This reads the image list safely from Firebase.
-    private fun readStringList(snapshot: DataSnapshot, key: String): ArrayList<String> {
-        val node = snapshot.child(key)
-        if (!node.exists()) return arrayListOf()
-
+    private fun readStringList(node: DataSnapshot): ArrayList<String> {
         val items = arrayListOf<String>()
         node.children.forEach { child ->
             val value = child.value?.toString()?.trim().orEmpty()
@@ -193,5 +276,73 @@ object ComplaintSnapshotParser {
             }
         }
         return items
+    }
+
+    // This reads complaint photos from list, single-value, or alternate image keys.
+    private fun readComplaintImages(snapshot: DataSnapshot): ArrayList<String> {
+        val imageNodes = listOf(
+            "images",
+            "imageUrls",
+            "photoUrls",
+            "mediaUrls",
+            "photos",
+            "media",
+            "attachments"
+        )
+
+        imageNodes.forEach { key ->
+            val node = snapshot.child(key)
+            if (!node.exists()) return@forEach
+
+            if (node.hasChildren()) {
+                val items = readStringList(node)
+                if (items.isNotEmpty()) return items
+
+                val nestedItems = arrayListOf<String>()
+                node.children.forEach { child ->
+                    readImageValue(child)?.let(nestedItems::add)
+                }
+                if (nestedItems.isNotEmpty()) return nestedItems
+            }
+
+            readImageValue(node)?.let { return arrayListOf(it) }
+        }
+
+        val singleImage = readString(
+            snapshot,
+            "image",
+            "imageUrl",
+            "imageUri",
+            "photo",
+            "photoUrl",
+            "mediaUrl",
+            "uploadedImageUrl",
+            "attachmentUrl",
+            "fileUrl",
+            "downloadUrl"
+        )
+        if (!singleImage.isNullOrBlank()) {
+            return arrayListOf(singleImage)
+        }
+
+        return arrayListOf()
+    }
+
+    // This reads one image string from either a direct value or a nested object with url-like keys.
+    private fun readImageValue(node: DataSnapshot): String? {
+        val directValue = node.value?.toString()?.trim().orEmpty()
+        if (directValue.isNotBlank() && directValue.lowercase(Locale.getDefault()) != "null" && !node.hasChildren()) {
+            return directValue
+        }
+
+        val nestedKeys = listOf("url", "uri", "src", "imageUrl", "photoUrl", "fileUrl", "downloadUrl")
+        nestedKeys.forEach { key ->
+            val value = node.child(key).value?.toString()?.trim().orEmpty()
+            if (value.isNotBlank() && value.lowercase(Locale.getDefault()) != "null") {
+                return value
+            }
+        }
+
+        return null
     }
 }

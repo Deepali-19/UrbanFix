@@ -103,5 +103,33 @@
                 android:textColor="#111827"
                 android:textSize="14sp" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="end"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBroadcastCancel"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/common_cancel"
+                android:textAllCaps="false"
+                android:textColor="#0B4CC2" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBroadcastSend"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:backgroundTint="#0B4CC2"
+                android:text="@string/common_send"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                app:cornerRadius="14dp" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

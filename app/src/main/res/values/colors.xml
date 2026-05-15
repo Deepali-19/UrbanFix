@@ -2,6 +2,11 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="app_bar_color">#145DA0</color>
-    <color name="status_bar_color">#000000</color>
+    <color name="app_bar_color">#F6F7FB</color>
+    <color name="status_bar_color">#F6F7FB</color>
+    <color name="phone_navigation_bar_color">#1976D2</color>
+    <color name="bottom_nav_active_indicator">#D1E3F6</color>
+    <color name="toolbar_text_dark">#111827</color>
+    <color name="profile_header_start">#2E8FF7</color>
+    <color name="profile_header_end">#0B4CC2</color>
 </resources>

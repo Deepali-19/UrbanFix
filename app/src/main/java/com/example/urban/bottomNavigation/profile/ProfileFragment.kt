@@ -16,6 +16,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.FileProvider
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.example.urban.AppLocaleManager
@@ -57,6 +59,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
     private lateinit var cameraIcon: ImageView
     private lateinit var loadingContainer: View
     private lateinit var contentScroll: View
+    private lateinit var profileHeaderContent: View
 
     private lateinit var tvName: TextView
     private lateinit var tvEmail: TextView
@@ -81,6 +84,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
     private var tempCameraUri: Uri? = null
     private var currentUser: User? = null
+    private var isViewReady = false
 
     private val galleryLauncher =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -96,11 +100,13 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
     // Sets up the profile screen.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        isViewReady = true
         themePrefs = requireContext().getSharedPreferences(PREF_THEME, android.content.Context.MODE_PRIVATE)
         profilePrefs = requireContext().getSharedPreferences(PREF_PROFILE, android.content.Context.MODE_PRIVATE)
 
         loadingContainer = view.findViewById(R.id.profileLoadingContainer)
         contentScroll = view.findViewById(R.id.profileContentScroll)
+        profileHeaderContent = view.findViewById(R.id.profileHeaderContent)
         profileImage = view.findViewById(R.id.profileImage)
         cameraIcon = view.findViewById(R.id.cameraIcon)
 
@@ -121,11 +127,36 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
         loadPreferenceSummary()
         loadUserData()
+        applyHeaderInsets()
 
         cameraIcon.setOnClickListener { showImagePickerDialog() }
+        profileImage.setOnClickListener {
+            val imageUrl = currentUser?.profileImageUrl.orEmpty()
+            if (imageUrl.isNotBlank()) {
+                showOfficialIdPreview(imageUrl)
+            }
+        }
         btnProfileSettings.setOnClickListener { openSettingsDialog() }
         btnProfileHelp.setOnClickListener { openHelpDialog() }
         btnLogout.setOnClickListener { logoutUser() }
+    }
+
+    // This adds the status bar space into the gradient header so the top feels continuous.
+    private fun applyHeaderInsets() {
+        val baseTopPadding = profileHeaderContent.paddingTop
+
+        ViewCompat.setOnApplyWindowInsetsListener(profileHeaderContent) { headerView, insets ->
+            val statusBarInset = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            headerView.setPadding(
+                headerView.paddingLeft,
+                baseTopPadding + statusBarInset,
+                headerView.paddingRight,
+                headerView.paddingBottom
+            )
+            insets
+        }
+
+        ViewCompat.requestApplyInsets(profileHeaderContent)
     }
 
     // Opens settings dialog.
@@ -304,10 +335,12 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         database.child("Users").child(uid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!isAdded || !isViewReady) return
                     showLoading(false)
 
                     if (!snapshot.exists()) return
 
+                    val context = context ?: return
                     val user = snapshot.getValue(User::class.java) ?: return
                     currentUser = user
 
@@ -316,14 +349,14 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
                     tvRole.text = localizedRoleLabel(user.role)
                     tvJoinedDate.text = formatJoinedDate(user.createdAt)
                     tvDepartment.text = ComplaintDataFormatter.localizedDepartmentName(
-                        requireContext(),
+                        context,
                         user.department.ifBlank { "General" }
                     )
                     tvCity.text = user.city.ifBlank { getString(R.string.profile_not_added) }
                     tvEmployeeId.text = user.employeeId.ifBlank { getString(R.string.profile_not_assigned) }
 
                     if (user.profileImageUrl.isNotBlank()) {
-                        Glide.with(requireContext())
+                        Glide.with(context)
                             .load(user.profileImageUrl)
                             .placeholder(R.drawable.ic_user_placeholder)
                             .error(R.drawable.ic_user_placeholder)
@@ -344,6 +377,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
                 }
 
                 override fun onCancelled(error: DatabaseError) {
+                    if (!isAdded || !isViewReady) return
                     showLoading(false)
                     toast(error.message)
                 }
@@ -367,6 +401,11 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
             .load(imageUrl)
             .into(image)
 
+        Glide.with(requireContext())
+            .asGif()
+            .load(R.raw.close_gif)
+            .into(close)
+
         close.setOnClickListener { dialog.dismiss() }
         dialog.show()
     }
@@ -381,6 +420,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
     // Toggles loading state.
     private fun showLoading(isLoading: Boolean) {
+        if (!isViewReady) return
         loadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
         contentScroll.visibility = if (isLoading) View.GONE else View.VISIBLE
     }
@@ -417,6 +457,13 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
     // Small toast helper.
     private fun toast(message: String) {
+        if (!isAdded || !isViewReady) return
         Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+    }
+
+    // Clears the ready flag when the profile view goes away.
+    override fun onDestroyView() {
+        isViewReady = false
+        super.onDestroyView()
     }
 }

@@ -115,6 +115,7 @@ class HomeFragment : Fragment() {
     private var currentDisplayRange = DashboardRange.THIS_MONTH
     private var currentBarDepartments: List<String> = emptyList()
     private var complaintsListener: ValueEventListener? = null
+    private var isViewReady = false
 
     // This creates the dashboard screen layout.
     override fun onCreateView(
@@ -129,6 +130,7 @@ class HomeFragment : Fragment() {
     // This connects all dashboard views and starts loading the data.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        isViewReady = true
 
         loadingContainer = binding.homeLoadingContainer
         contentLayout = binding.contentLayout
@@ -187,10 +189,11 @@ class HomeFragment : Fragment() {
 
     // This removes the live complaint listener when the view is destroyed.
     override fun onDestroyView() {
-        super.onDestroyView()
+        isViewReady = false
         complaintsListener?.let { complaintsRef.removeEventListener(it) }
         complaintsListener = null
         _binding = null
+        super.onDestroyView()
     }
 
     // This sets refresh and share button actions for the dashboard.
@@ -218,6 +221,8 @@ class HomeFragment : Fragment() {
             .child(uid)
             .get()
             .addOnSuccessListener { userSnapshot ->
+                if (!canUseUi()) return@addOnSuccessListener
+
                 currentRole = userSnapshot.child("role").value?.toString().orEmpty()
                 currentDepartment = userSnapshot.child("department").value?.toString().orEmpty()
                 currentName = userSnapshot.child("name").value?.toString().orEmpty()
@@ -226,10 +231,12 @@ class HomeFragment : Fragment() {
                 bindHeader()
 
                 loadOfficerDirectory {
+                    if (!canUseUi()) return@loadOfficerDirectory
                     attachComplaintsListener(uid)
                 }
             }
             .addOnFailureListener {
+                if (!canUseUi()) return@addOnFailureListener
                 finishRefreshState()
                 showLoading(false)
             }
@@ -248,12 +255,15 @@ class HomeFragment : Fragment() {
             .equalTo("Field Officer")
             .get()
             .addOnSuccessListener { snapshot ->
+                if (!canUseUi()) return@addOnSuccessListener
+
                 officerDirectory = snapshot.children.associate { officer ->
                     officer.key.orEmpty() to officer.child("name").value?.toString().orEmpty().ifBlank { "Field Officer" }
                 }
                 onComplete()
             }
             .addOnFailureListener {
+                if (!canUseUi()) return@addOnFailureListener
                 officerDirectory = emptyMap()
                 onComplete()
             }
@@ -265,9 +275,11 @@ class HomeFragment : Fragment() {
 
         complaintsListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                if (!canUseUi()) return
+
                 val visibleComplaints = ArrayList<Complaint>()
 
-                for (item in snapshot.children) {
+                for (item in ComplaintSnapshotParser.complaintSnapshots(snapshot)) {
                     val complaint = ComplaintSnapshotParser.fromSnapshot(item) ?: continue
                     if (shouldIncludeComplaint(complaint, uid)) {
                         visibleComplaints.add(complaint)
@@ -282,6 +294,7 @@ class HomeFragment : Fragment() {
             }
 
             override fun onCancelled(error: DatabaseError) {
+                if (!canUseUi()) return
                 finishRefreshState()
                 showLoading(false)
             }
@@ -292,6 +305,7 @@ class HomeFragment : Fragment() {
 
     // This stops the pull-to-refresh spinner after loading is done.
     private fun finishRefreshState() {
+        if (!canUseUi()) return
         binding.swipeRefreshLayout.isRefreshing = false
     }
 
@@ -300,13 +314,22 @@ class HomeFragment : Fragment() {
         if (currentRole == "Field Officer") return
 
         val etaUpdates = ComplaintEtaManager.buildEtaUpdates(complaints)
-        etaUpdates.forEach { (complaintKey, updates) ->
-            complaintsRef.child(complaintKey).updateChildren(updates)
+        etaUpdates.forEach { (complaintPathOrKey, updates) ->
+            if (complaintPathOrKey.startsWith("/")) {
+                FirebaseDatabase.getInstance()
+                    .getReference(complaintPathOrKey.trimStart('/'))
+                    .updateChildren(updates)
+            } else {
+                complaintsRef.child(complaintPathOrKey).updateChildren(updates)
+            }
         }
     }
 
     // This fills the dashboard greeting and subtitle based on the logged-in user role.
     private fun bindHeader() {
+        if (!canUseUi()) return
+
+        val context = context ?: return
         val firstName = currentName.trim().split(" ").firstOrNull().orEmpty().ifBlank { getString(R.string.generic_user) }
         val greetingPrefix = when (LocalTime.now().hour) {
             in 5..11 -> getString(R.string.dashboard_greeting_morning)
@@ -322,7 +345,7 @@ class HomeFragment : Fragment() {
             "Department Admin" -> getString(
                 R.string.dashboard_subtitle_department_admin,
                 ComplaintDataFormatter.localizedDepartmentName(
-                    requireContext(),
+                    context,
                     currentDepartment.ifBlank { "General" }
                 )
             )
@@ -333,6 +356,7 @@ class HomeFragment : Fragment() {
 
     // This shows or hides the dashboard loading screen.
     private fun showLoading(isLoading: Boolean) {
+        if (!canUseUi()) return
         loadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
         binding.swipeRefreshLayout.visibility = if (isLoading) View.GONE else View.VISIBLE
     }
@@ -354,6 +378,9 @@ class HomeFragment : Fragment() {
 
     // This updates every dashboard card and chart from one shared analytics result.
     private fun bindMetrics() {
+        if (!canUseUi()) return
+
+        val context = context ?: return
         selectedRange = DashboardRange.ALL_TIME
         val metrics = DashboardAnalytics.buildMetrics(
             complaints = allVisibleComplaints,
@@ -381,7 +408,7 @@ class HomeFragment : Fragment() {
         tvToday.text = metrics.todayCount.toString()
         tvMonth.text = metrics.monthCount.toString()
         tvResolutionRate.text = metrics.resolutionRate
-        tvTopDepartment.text = ComplaintDataFormatter.localizedDepartmentName(requireContext(), metrics.topDepartment)
+        tvTopDepartment.text = ComplaintDataFormatter.localizedDepartmentName(context, metrics.topDepartment)
         tvNearBreachCount.text = getString(R.string.dashboard_near_breach_count, metrics.nearBreachCount)
         tvOverdueCount.text = getString(R.string.dashboard_overdue_count, metrics.overdueCount)
         tvActiveOfficers.text = getString(R.string.dashboard_active_officers, metrics.activeOfficers)
@@ -391,7 +418,7 @@ class HomeFragment : Fragment() {
         tvAverageResolutionTime.text = metrics.averageResolutionTime
         tvFastestDepartment.text = getString(
             R.string.dashboard_fastest_department,
-            ComplaintDataFormatter.localizedDepartmentName(requireContext(), metrics.fastestDepartment)
+            ComplaintDataFormatter.localizedDepartmentName(context, metrics.fastestDepartment)
         )
         tvLastUpdated.text = getString(R.string.dashboard_last_updated_all_data)
 
@@ -648,6 +675,8 @@ class HomeFragment : Fragment() {
 
     // This translates internal role text into the currently selected app language.
     private fun localizedRoleLabel(role: String): String {
+        if (!isAdded) return role.ifBlank { "Dashboard" }
+
         return when (role) {
             "Super Admin" -> getString(R.string.role_super_admin)
             "Department Admin" -> getString(R.string.role_department_admin)
@@ -658,12 +687,15 @@ class HomeFragment : Fragment() {
 
     // This fills the recent activity section at the bottom of the dashboard.
     private fun bindRecentActivity(items: List<DashboardActivityItem>) {
+        if (!canUseUi()) return
+
+        val context = context ?: return
         recentActivityContainer.removeAllViews()
         tvRecentActivityEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
 
         if (items.isEmpty()) return
 
-        val inflater = LayoutInflater.from(requireContext())
+        val inflater = LayoutInflater.from(context)
         items.forEach { item ->
             val row = inflater.inflate(R.layout.item_dashboard_activity, recentActivityContainer, false)
             val titleView = row.findViewById<TextView>(R.id.tvActivityTitle)
@@ -682,5 +714,10 @@ class HomeFragment : Fragment() {
 
             recentActivityContainer.addView(row)
         }
+    }
+
+    // This keeps async callbacks from touching the dashboard after the view is gone.
+    private fun canUseUi(): Boolean {
+        return isAdded && isViewReady && _binding != null
     }
 }

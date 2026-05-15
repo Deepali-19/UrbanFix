@@ -37,4 +37,8 @@ data class Complaint(
     @get:Exclude
     @set:Exclude
     var firebaseKey: String = ""
+
+    @get:Exclude
+    @set:Exclude
+    var firebasePath: String = ""
 }

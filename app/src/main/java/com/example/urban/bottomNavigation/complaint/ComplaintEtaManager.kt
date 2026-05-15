@@ -27,7 +27,7 @@ object ComplaintEtaManager {
         val updates = linkedMapOf<String, Map<String, Any>>()
 
         complaints.forEach { complaint ->
-            val complaintKey = complaint.firebaseKey.ifBlank { return@forEach }
+            val complaintKey = complaint.firebasePath.ifBlank { complaint.firebaseKey }.ifBlank { return@forEach }
             val payload = calculateEta(complaint, openDepartmentLoad[ComplaintDataFormatter.resolvedDepartment(complaint)] ?: 1, now)
                 ?: return@forEach
 

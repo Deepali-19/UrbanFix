@@ -22,11 +22,13 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
     private lateinit var tvOfficerBusy: TextView
     private val list = ArrayList<FieldOfficer>()
     private lateinit var adapter: FieldOfficerAdapter
+    private var isViewReady = false
 
     private val database = FirebaseDatabase.getInstance().reference
 
     // Sets up the officer list screen.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        isViewReady = true
         recyclerView = view.findViewById(R.id.recyclerView)
         loadingContainer = view.findViewById(R.id.officerLoadingContainer)
         emptyView = view.findViewById(R.id.tvOfficerEmpty)
@@ -35,6 +37,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
         tvOfficerBusy = view.findViewById(R.id.tvOfficerBusy)
 
         adapter = FieldOfficerAdapter(list) { officer ->
+            if (!canUseUi() || parentFragmentManager.isStateSaved) return@FieldOfficerAdapter
             val fragment = OfficerDetailFragment.newInstance(officer.uid)
             parentFragmentManager.beginTransaction()
                 .replace(R.id.fragmentContainer, fragment)
@@ -57,6 +60,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
             .equalTo("Field Officer")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!canUseUi()) return
                     val officers = ArrayList<FieldOfficer>()
 
                     for (data in snapshot.children) {
@@ -77,6 +81,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
                 }
 
                 override fun onCancelled(error: DatabaseError) {
+                    if (!canUseUi()) return
                     list.clear()
                     adapter.notifyDataSetChanged()
                     updateSummary()
@@ -92,6 +97,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
         database.child("Complaints")
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!canUseUi()) return
                     val preparedList = officers.map { officer ->
                         officer.copy(
                             assignedCount = 0,
@@ -122,6 +128,7 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
                 }
 
                 override fun onCancelled(error: DatabaseError) {
+                    if (!canUseUi()) return
                     list.clear()
                     list.addAll(officers.filter { officerMap.containsKey(it.uid) })
                     adapter.notifyDataSetChanged()
@@ -145,10 +152,22 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
 
     // Toggles loading state.
     private fun showLoading(isLoading: Boolean) {
+        if (!canUseUi()) return
         loadingContainer.visibility = if (isLoading) View.VISIBLE else View.GONE
         recyclerView.visibility = if (isLoading) View.GONE else View.VISIBLE
         if (isLoading) {
             emptyView.visibility = View.GONE
         }
+    }
+
+    // Clears the ready flag when the view goes away.
+    override fun onDestroyView() {
+        isViewReady = false
+        super.onDestroyView()
+    }
+
+    // Returns true only when the fragment can still update UI safely.
+    private fun canUseUi(): Boolean {
+        return isAdded && isViewReady
     }
 }

@@ -1,9 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.Urban" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Dark colors -->
-        <item name="colorPrimary">#1E1E1E</item>
+        <item name="colorPrimary">@color/app_bar_color</item>
         <item name="colorSecondary">#BB86FC</item>
         <item name="android:statusBarColor">@color/status_bar_color</item>
+        <item name="android:navigationBarColor">@color/phone_navigation_bar_color</item>
         <item name="android:windowBackground">#121212</item>
     </style>
 </resources>

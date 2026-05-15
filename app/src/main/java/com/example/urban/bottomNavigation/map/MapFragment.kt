@@ -130,6 +130,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
     private var isMapReady = false
     private var isUserLoaded = false
     private var isComplaintsLoaded = false
+    private var isViewReady = false
     private var lastKnownUserLatLng: LatLng? = null
     private val locationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -141,6 +142,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
     // This function connects all map views and starts loading the user role and map fragment.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        isViewReady = true
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
         mapLoadingContainer = view.findViewById(R.id.mapLoadingContainer)
         mapOverlayContent = view.findViewById(R.id.mapOverlayContent)
@@ -185,6 +187,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             childFragmentManager.findFragmentById(R.id.mapContainer) as? SupportMapFragment
 
         val mapFragment = existingMapFragment ?: SupportMapFragment.newInstance().also {
+            if (childFragmentManager.isStateSaved) return
             childFragmentManager.beginTransaction()
                 .replace(R.id.mapContainer, it)
                 .commit()
@@ -275,6 +278,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         database.child("Users").child(currentUid)
             .get()
             .addOnSuccessListener { snapshot ->
+                if (!canUseUi()) return@addOnSuccessListener
                 currentRole = snapshot.child("role").value?.toString().orEmpty()
                 currentDepartment = normalizeDepartment(snapshot.child("department").value?.toString().orEmpty())
                 isUserLoaded = true
@@ -282,6 +286,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
                 listenToComplaints()
             }
             .addOnFailureListener {
+                if (!canUseUi()) return@addOnFailureListener
                 isUserLoaded = true
                 configureRoleUi()
                 renderMap()
@@ -336,9 +341,10 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         complaintsRef = database.child("Complaints")
         complaintsListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                if (!canUseUi()) return
                 roleComplaints.clear()
 
-                for (child in snapshot.children) {
+                for (child in ComplaintSnapshotParser.complaintSnapshots(snapshot)) {
                     val complaint = ComplaintSnapshotParser.fromSnapshot(child) ?: continue
 
                     if (shouldIncludeForRole(complaint)) {
@@ -351,6 +357,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             }
 
             override fun onCancelled(error: DatabaseError) {
+                if (!canUseUi()) return
                 isComplaintsLoaded = true
                 renderMap()
             }
@@ -371,7 +378,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
     // This function decides what should be drawn on the map after filters and role rules are applied.
     private fun renderMap() {
-        if (!isMapReady || !isUserLoaded) return
+        if (!canUseUi() || !isMapReady || !isUserLoaded) return
 
         if (!isComplaintsLoaded) {
             mapLoadingContainer.visibility = View.VISIBLE
@@ -450,6 +457,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
         fusedLocationClient.lastLocation
             .addOnSuccessListener { location ->
+                if (!canUseUi()) return@addOnSuccessListener
                 val latLng = location?.toLatLng()
                 if (latLng != null) {
                     lastKnownUserLatLng = latLng
@@ -697,7 +705,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         center: LatLng,
         locationHint: String
     ) {
-        if (complaints.isEmpty()) return
+        if (complaints.isEmpty() || !canUseUi()) return
 
         val dialog = BottomSheetDialog(requireContext())
         val view = LayoutInflater.from(requireContext())
@@ -796,6 +804,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
     private fun openComplaintDetail(complaint: Complaint) {
         val complaintKey = complaint.firebaseKey.ifBlank { complaint.complaintId }
         if (complaintKey.isBlank()) return
+        if (parentFragmentManager.isStateSaved) return
 
         parentFragmentManager.beginTransaction()
             .replace(R.id.fragmentContainer, ComplaintDetailFragment.newInstance(complaintKey))
@@ -1027,6 +1036,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
     // This function removes map listeners and Firebase listeners when the view is destroyed.
     override fun onDestroyView() {
+        isViewReady = false
         complaintsListener?.let { listener ->
             complaintsRef?.removeEventListener(listener)
         }
@@ -1035,6 +1045,11 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         googleMap = null
         clusterManager = null
         super.onDestroyView()
+    }
+
+    // Returns true only when the map screen is still attached and visible enough for UI work.
+    private fun canUseUi(): Boolean {
+        return isAdded && isViewReady
     }
 
     // This renderer customizes clustered complaint markers without changing the clustering logic.

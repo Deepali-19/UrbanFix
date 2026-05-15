@@ -4,6 +4,7 @@
         <item name="colorPrimary">@color/app_bar_color</item>
         <item name="colorSecondary">#FFD166</item>
         <item name="android:statusBarColor">@color/status_bar_color</item>
+        <item name="android:navigationBarColor">@color/phone_navigation_bar_color</item>
         <item name="android:windowBackground">#F6F7FB</item>
     </style>
 </resources>

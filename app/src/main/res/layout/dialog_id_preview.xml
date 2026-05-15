@@ -1,31 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#D3D3D3"
-    >
+    android:background="#66000000"
+    android:padding="8dp">
 
-
-    <!-- Close Button -->
-    <ImageView
-        android:id="@+id/btnClose"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_alignParentEnd="true"
-        android:layout_margin="16dp"
-        android:padding="8dp"
-        android:src="@drawable/xclose_circle"
-        android:background="@android:color/white"
-        android:elevation="4dp"/>
-
-    <!-- Official ID Image -->
-    <ImageView
-        android:id="@+id/imgOfficialId"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_centerInParent="true"
-        android:padding="24dp"
-        android:scaleType="fitCenter"/>
-    >
+        android:layout_gravity="center"
+        android:background="@drawable/bg_id_preview_frame"
+        android:padding="1dp">
 
-</RelativeLayout>
+        <com.example.urban.common.ZoomableImageView
+            android:id="@+id/imgOfficialId"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/white"
+            android:scaleType="fitCenter" />
+
+        <ImageView
+            android:id="@+id/btnClose"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="2dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/common_close"
+            android:elevation="6dp"
+            android:scaleType="fitCenter" />
+    </FrameLayout>
+
+</FrameLayout>

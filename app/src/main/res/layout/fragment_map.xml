@@ -58,6 +58,7 @@
                     android:paddingHorizontal="8dp"
                     android:text="My Spot"
                     android:textAllCaps="false"
+                    android:textColor="#0B4CC2"
                     android:textSize="11sp" />
 
                 <com.google.android.material.button.MaterialButton
@@ -71,6 +72,7 @@
                     android:paddingHorizontal="8dp"
                     android:text="Recenter"
                     android:textAllCaps="false"
+                    android:textColor="#0B4CC2"
                     android:textSize="11sp" />
             </LinearLayout>
 

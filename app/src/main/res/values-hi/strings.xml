@@ -35,6 +35,8 @@
     <string name="toolbar_notifications">सूचनाएं</string>
     <string name="toolbar_map">मानचित्र</string>
     <string name="toolbar_field_officers">फील्ड अधिकारी</string>
+    <string name="toolbar_officer_detail">अधिकारी विवरण</string>
+    <string name="toolbar_complaint_detail">शिकायत विवरण</string>
 
     <string name="dashboard_loading_title">डैशबोर्ड लोड हो रहा है...</string>
     <string name="dashboard_loading_body">नवीनतम शिकायत डेटा लाया जा रहा है</string>
@@ -125,6 +127,12 @@
     <string name="signup_city">शहर / नगरपालिका</string>
     <string name="signup_employee_id">कर्मचारी आईडी</string>
     <string name="signup_upload_id">आधिकारिक पहचान प्रमाण अपलोड करें</string>
+    <string name="signup_view_uploaded_id">आईडी देखें</string>
+    <string name="signup_id_selected_placeholder">आधिकारिक आईडी चुनी गई</string>
+    <string name="signup_id_uploading">आईडी प्रमाण अपलोड हो रहा है...</string>
+    <string name="signup_id_uploaded_successfully">आईडी सफलतापूर्वक अपलोड हुई</string>
+    <string name="signup_id_upload_failed">अपलोड असफल रहा</string>
+    <string name="signup_no_uploaded_id_preview">पूर्वावलोकन के लिए कोई अपलोड की गई आईडी नहीं है</string>
     <string name="signup_create_account">खाता बनाएं</string>
     <string name="signup_already_have_account">क्या पहले से खाता है?</string>
 
@@ -233,12 +241,15 @@
 
     <string name="common_no_data">कोई डेटा नहीं</string>
     <string name="common_send">भेजें</string>
+    <string name="app_lock_title">अर्बन फिक्स अनलॉक करें</string>
+    <string name="app_lock_subtitle">ऐप खोलने के लिए फोन लॉक का उपयोग करें</string>
 
     <string name="alerts_center">अलर्ट सेंटर</string>
     <string name="alerts_subtitle_default">FCM अलर्ट, शिकायत अपडेट और संचालन संबंधी सूचनाएं।</string>
     <string name="alerts_subtitle_super">FCM अलर्ट, शिकायत अपडेट, संचालन सूचनाएं और नागरिक प्रसारण।</string>
     <string name="alerts_subtitle_department">विभागीय अलर्ट, शिकायत अपडेट और प्रसारण संचार यहाँ दिखते हैं।</string>
     <string name="alerts_mark_all_read">सभी पढ़ा चिह्नित करें</string>
+    <string name="alerts_mark_read_short">पढ़ा करें</string>
     <string name="alerts_clear">साफ़ करें</string>
     <string name="alerts_empty_title">अभी कोई अलर्ट नहीं</string>
     <string name="alerts_empty_body">नई शिकायत अलर्ट, असाइनमेंट अपडेट और FCM सूचनाएं यहाँ दिखाई देंगी।</string>
@@ -260,6 +271,7 @@
     <string name="alerts_choose_target_department">एक लक्ष्य विभाग चुनें</string>
     <string name="alerts_choose_supported_department">Water, Roads, Sanitation, Electricity या All Departments चुनें</string>
     <string name="alerts_invalid_department_account">प्रसारण भेजने के लिए आपके एडमिन खाते में मान्य विभाग होना चाहिए।</string>
+    <string name="alerts_broadcast_tooltip">ब्रॉडकास्ट संदेश</string>
     <string name="alerts_broadcast_sent_title">प्रसारण भेजा गया</string>
     <string name="alerts_broadcast_sent_body">%1$s को %2$s तक भेजा गया।</string>
     <string name="alerts_broadcast_sent_to">प्रसारण %1$s को भेजा गया।</string>

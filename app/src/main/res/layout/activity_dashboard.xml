@@ -19,7 +19,7 @@
             android:layout_height="wrap_content"
             android:background="@color/app_bar_color"
             android:title="@string/toolbar_dashboard"
-            android:titleTextColor="@android:color/white"
+            android:titleTextColor="@color/toolbar_text_dark"
             app:navigationIcon="@drawable/navi_drawer"/>
 
         <!--  FRAGMENT CONTAINER -->

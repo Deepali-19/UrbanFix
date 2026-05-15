@@ -3,6 +3,9 @@ package com.example.urban
 // Small wrapper for values coming from BuildConfig.
 object AppConfig {
 
+    val mapsApiKey: String
+        get() = BuildConfig.MAPS_API_KEY
+
     val appwriteEndpoint: String
         get() = BuildConfig.APPWRITE_ENDPOINT
 

@@ -137,6 +137,7 @@
                             android:layout_weight="1"
                             android:text="View Image"
                             android:textAllCaps="false"
+                            android:textColor="#0B4CC2"
                             android:visibility="gone" />
 
                         <com.google.android.material.button.MaterialButton
@@ -148,6 +149,7 @@
                             android:layout_weight="1"
                             android:text="Open Location"
                             android:textAllCaps="false"
+                            android:textColor="#0B4CC2"
                             android:visibility="gone" />
                     </LinearLayout>
                 </LinearLayout>
@@ -204,7 +206,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
                         android:text="Check Image"
-                        android:textAllCaps="false" />
+                        android:textAllCaps="false"
+                        android:textColor="#0B4CC2" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -259,7 +262,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
                         android:text="Generate Suggestion"
-                        android:textAllCaps="false" />
+                        android:textAllCaps="false"
+                        android:textColor="#0B4CC2" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -513,6 +517,7 @@
                         android:layout_marginTop="10dp"
                         android:text="Notify ETA In App"
                         android:textAllCaps="false"
+                        android:textColor="#0B4CC2"
                         android:visibility="gone" />
 
                     <TextView

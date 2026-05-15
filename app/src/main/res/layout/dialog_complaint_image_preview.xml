@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:background="#E6121824">
 
-    <ImageView
+    <com.example.urban.common.ZoomableImageView
         android:id="@+id/imgComplaintPreview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

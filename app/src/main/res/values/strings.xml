@@ -35,6 +35,8 @@
     <string name="toolbar_notifications">Notifications</string>
     <string name="toolbar_map">Map</string>
     <string name="toolbar_field_officers">Field Officers</string>
+    <string name="toolbar_officer_detail">Officer Details</string>
+    <string name="toolbar_complaint_detail">Complaint Details</string>
 
     <string name="dashboard_loading_title">Loading dashboard...</string>
     <string name="dashboard_loading_body">Fetching the latest complaint data</string>
@@ -125,6 +127,12 @@
     <string name="signup_city">City / Municipality</string>
     <string name="signup_employee_id">Employee ID</string>
     <string name="signup_upload_id">Upload Official ID Proof</string>
+    <string name="signup_view_uploaded_id">View ID</string>
+    <string name="signup_id_selected_placeholder">Official ID selected</string>
+    <string name="signup_id_uploading">Uploading ID proof...</string>
+    <string name="signup_id_uploaded_successfully">ID uploaded successfully</string>
+    <string name="signup_id_upload_failed">Upload failed</string>
+    <string name="signup_no_uploaded_id_preview">No uploaded ID to preview yet</string>
     <string name="signup_create_account">Create Account</string>
     <string name="signup_already_have_account">Already have an account?</string>
 
@@ -233,12 +241,15 @@
 
     <string name="common_no_data">No data</string>
     <string name="common_send">Send</string>
+    <string name="app_lock_title">Unlock Urban Fix</string>
+    <string name="app_lock_subtitle">Use your phone lock to open the app</string>
 
     <string name="alerts_center">Alert Center</string>
     <string name="alerts_subtitle_default">FCM alerts, complaint updates, and operational notifications.</string>
     <string name="alerts_subtitle_super">FCM alerts, complaint updates, operational notifications, and civilian broadcasts.</string>
     <string name="alerts_subtitle_department">Department alerts, complaint updates, and broadcast communication live here.</string>
     <string name="alerts_mark_all_read">Mark All Read</string>
+    <string name="alerts_mark_read_short">Mark Read</string>
     <string name="alerts_clear">Clear</string>
     <string name="alerts_empty_title">No alerts yet</string>
     <string name="alerts_empty_body">New complaint alerts, assignment updates, and FCM notifications will appear here.</string>
@@ -260,6 +271,7 @@
     <string name="alerts_choose_target_department">Choose a target department</string>
     <string name="alerts_choose_supported_department">Choose Water, Roads, Sanitation, Electricity, or All Departments</string>
     <string name="alerts_invalid_department_account">Your admin account needs a valid department to send broadcasts.</string>
+    <string name="alerts_broadcast_tooltip">Broadcast message</string>
     <string name="alerts_broadcast_sent_title">Broadcast sent</string>
     <string name="alerts_broadcast_sent_body">%1$s was sent to %2$s.</string>
     <string name="alerts_broadcast_sent_to">Broadcast sent to %1$s.</string>

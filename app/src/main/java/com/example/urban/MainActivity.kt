@@ -6,15 +6,27 @@ import android.os.Handler
 import android.os.Looper
 import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import com.example.urban.AppLocaleManager
 import com.example.urban.loginSingUp.LoginActivity
+import com.example.urban.loginSingUp.AppLockManager
 import com.example.urban.loginSingUp.SessionManager
 import com.example.urban.bottomNavigation.DashboardActivity
 import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : AppCompatActivity() {
+
+    private val appLockLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                SessionManager.markUnlocked(this)
+                openDashboard()
+            } else {
+                finish()
+            }
+        }
 
     // Shows splash and routes the user.
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,30 +62,41 @@ class MainActivity : AppCompatActivity() {
 
         // Open dashboard or login after splash.
         Handler(Looper.getMainLooper()).postDelayed({
-
-            val user = FirebaseAuth.getInstance().currentUser
-
-            if (user != null && !SessionManager.isExpired(this)) {
-                SessionManager.refreshActivity(this)
-                startActivity(Intent(this, DashboardActivity::class.java))
-            } else {
-                if (user != null) {
-                    FirebaseAuth.getInstance().signOut()
-                    SessionManager.clear(this)
-                }
-                startActivity(Intent(this, LoginActivity::class.java).apply {
-                    putExtra(SessionManager.EXTRA_SESSION_EXPIRED, user != null)
-                    if (user != null) {
-                        putExtra(
-                            SessionManager.EXTRA_SESSION_MESSAGE,
-                            getString(R.string.session_expired_login_again)
-                        )
-                    }
-                })
-            }
-
-            finish()
+            routeAfterSplash()
 
         }, 1500)
+    }
+
+    // Decides whether to go to login, unlock, or open the dashboard.
+    private fun routeAfterSplash() {
+        val user = FirebaseAuth.getInstance().currentUser
+
+        if (user == null) {
+            startActivity(Intent(this, LoginActivity::class.java).apply {
+                putExtra(SessionManager.EXTRA_SESSION_EXPIRED, false)
+            })
+            finish()
+            return
+        }
+
+        if (SessionManager.isAppLockRequired(this)) {
+            val unlockIntent = AppLockManager.createUnlockIntent(this)
+            if (unlockIntent != null) {
+                appLockLauncher.launch(unlockIntent)
+            } else {
+                SessionManager.markUnlocked(this)
+                openDashboard()
+            }
+            return
+        }
+
+        openDashboard()
+    }
+
+    // Opens the dashboard for already signed-in users.
+    private fun openDashboard() {
+        SessionManager.refreshActivity(this)
+        startActivity(Intent(this, DashboardActivity::class.java))
+        finish()
     }
 }

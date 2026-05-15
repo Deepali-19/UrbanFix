@@ -6,11 +6,11 @@ object SessionManager {
 
     const val EXTRA_SESSION_EXPIRED = "session_expired"
     const val EXTRA_SESSION_MESSAGE = "session_message"
-    const val TIMEOUT_MS = 24L * 60L * 60L * 1000L
 
     private const val PREF_SESSION = "session_prefs"
     private const val KEY_LAST_ACTIVITY = "last_activity"
     private const val KEY_LAST_BACKGROUND_AT = "last_background_at"
+    private const val KEY_APP_LOCK_REQUIRED = "app_lock_required"
 
     // Marks login as active.
     fun markAuthenticated(context: Context) {
@@ -18,6 +18,7 @@ object SessionManager {
             .edit()
             .putLong(KEY_LAST_ACTIVITY, System.currentTimeMillis())
             .putLong(KEY_LAST_BACKGROUND_AT, 0L)
+            .putBoolean(KEY_APP_LOCK_REQUIRED, false)
             .apply()
     }
 
@@ -26,29 +27,36 @@ object SessionManager {
         context.getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
             .edit()
             .putLong(KEY_LAST_ACTIVITY, System.currentTimeMillis())
-            .putLong(KEY_LAST_BACKGROUND_AT, 0L)
             .apply()
     }
 
-    // Saves when the app went to background.
+    // Saves when the app went to background and asks for app unlock next time.
     fun markBackgrounded(context: Context) {
         context.getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
             .edit()
             .putLong(KEY_LAST_BACKGROUND_AT, System.currentTimeMillis())
+            .putBoolean(KEY_APP_LOCK_REQUIRED, true)
             .apply()
     }
 
-    // Checks whether the session expired.
+    // Session expiry is turned off now, so logged-in users stay signed in.
     fun isExpired(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
-        val backgroundedAt = prefs.getLong(KEY_LAST_BACKGROUND_AT, 0L)
-        if (backgroundedAt > 0L) {
-            return System.currentTimeMillis() - backgroundedAt > TIMEOUT_MS
-        }
-
-        val lastActivity = prefs.getLong(KEY_LAST_ACTIVITY, 0L)
-        if (lastActivity <= 0L) return false
         return false
+    }
+
+    // Returns whether the app should ask for biometric or device lock now.
+    fun isAppLockRequired(context: Context): Boolean {
+        return context.getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
+            .getBoolean(KEY_APP_LOCK_REQUIRED, false)
+    }
+
+    // Marks the app as unlocked after a successful biometric or device credential check.
+    fun markUnlocked(context: Context) {
+        context.getSharedPreferences(PREF_SESSION, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_APP_LOCK_REQUIRED, false)
+            .putLong(KEY_LAST_BACKGROUND_AT, 0L)
+            .apply()
     }
 
     // Clears saved session data.

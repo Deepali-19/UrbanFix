@@ -2,11 +2,14 @@ package com.example.urban.bottomNavigation.alert
 
 import android.app.AlertDialog
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
+import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.EditText
+import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -28,14 +31,8 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
     private lateinit var contentContainer: View
     private lateinit var emptyState: View
     private lateinit var rvAlerts: RecyclerView
-    private lateinit var tvAlertSubtitle: TextView
-    private lateinit var tvBroadcastAccess: TextView
-    private lateinit var tvAlertTotal: TextView
-    private lateinit var tvAlertUnread: TextView
-    private lateinit var tvAlertRead: TextView
-    private lateinit var btnMarkAllRead: MaterialButton
-    private lateinit var btnClearAlerts: MaterialButton
     private lateinit var fabBroadcast: FloatingActionButton
+    private var broadcastTooltip: PopupWindow? = null
 
     private lateinit var adapter: AlertAdapter
     private val database = FirebaseDatabase.getInstance().reference
@@ -52,28 +49,24 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         "Electricity"
     )
     private val broadcastDepartmentOptions = listOf("All Departments") + supportedDepartments
+    private var isViewReady = false
 
     // Sets up the alerts screen.
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        isViewReady = true
         loadingContainer = view.findViewById(R.id.alertsLoadingContainer)
         contentContainer = view.findViewById(R.id.alertsContentContainer)
         emptyState = view.findViewById(R.id.emptyAlertsState)
         rvAlerts = view.findViewById(R.id.rvAlerts)
-        tvAlertSubtitle = view.findViewById(R.id.tvAlertSubtitle)
-        tvBroadcastAccess = view.findViewById(R.id.tvBroadcastAccess)
-        tvAlertTotal = view.findViewById(R.id.tvAlertTotal)
-        tvAlertUnread = view.findViewById(R.id.tvAlertUnread)
-        tvAlertRead = view.findViewById(R.id.tvAlertRead)
-        btnMarkAllRead = view.findViewById(R.id.btnMarkAllRead)
-        btnClearAlerts = view.findViewById(R.id.btnClearAlerts)
         fabBroadcast = view.findViewById(R.id.fabBroadcast)
 
         adapter = AlertAdapter { alert ->
+            if (!canUseUi()) return@AlertAdapter
             AlertStorage.markRead(requireContext(), alert.id)
             refreshAlerts()
 
             val complaintKey = alert.complaintKey.ifBlank { alert.complaintDisplayId }
-            if (complaintKey.isNotBlank()) {
+            if (complaintKey.isNotBlank() && !parentFragmentManager.isStateSaved) {
                 parentFragmentManager.beginTransaction()
                     .replace(R.id.fragmentContainer, ComplaintDetailFragment.newInstance(complaintKey))
                     .addToBackStack(null)
@@ -84,18 +77,14 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         rvAlerts.layoutManager = LinearLayoutManager(requireContext())
         rvAlerts.adapter = adapter
 
-        btnMarkAllRead.setOnClickListener {
-            AlertStorage.markAllRead(requireContext())
-            refreshAlerts()
-        }
-
-        btnClearAlerts.setOnClickListener {
-            AlertStorage.clearAll(requireContext())
-            refreshAlerts()
-        }
-
         fabBroadcast.setOnClickListener {
+            dismissBroadcastTooltip()
             showBroadcastDialog()
+        }
+
+        fabBroadcast.setOnLongClickListener {
+            showBroadcastTooltip(it)
+            true
         }
 
         loadCurrentUserAccess()
@@ -105,19 +94,23 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
     // Reload alerts when coming back.
     override fun onResume() {
         super.onResume()
+        if (!canUseUi()) return
         refreshAlerts()
+    }
+
+    // Clears the small popup label when the view closes.
+    override fun onDestroyView() {
+        isViewReady = false
+        dismissBroadcastTooltip()
+        super.onDestroyView()
     }
 
     // Loads alerts and updates counters.
     private fun refreshAlerts() {
+        if (!canUseUi()) return
         val alerts = AlertStorage.getAlerts(requireContext())
-        val unreadCount = alerts.count { !it.isRead }
 
         adapter.updateItems(alerts)
-        tvAlertTotal.text = getString(R.string.summary_total, alerts.size)
-        tvAlertUnread.text = getString(R.string.alerts_unread, unreadCount)
-        tvAlertRead.text = getString(R.string.alerts_read, alerts.size - unreadCount)
-
         emptyState.visibility = if (alerts.isEmpty()) View.VISIBLE else View.GONE
         contentContainer.visibility = View.VISIBLE
         loadingContainer.visibility = View.GONE
@@ -133,6 +126,7 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         database.child("Users").child(uid)
             .get()
             .addOnSuccessListener { snapshot ->
+                if (!canUseUi()) return@addOnSuccessListener
                 val user = snapshot.getValue(User::class.java)
                 currentUserName = user?.name.orEmpty()
                 currentUserRole = user?.role.orEmpty()
@@ -140,47 +134,84 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
                 configureBroadcastAccess()
             }
             .addOnFailureListener {
+                if (!canUseUi()) return@addOnFailureListener
                 configureBroadcastAccess()
             }
     }
 
     // Shows or hides broadcast controls.
     private fun configureBroadcastAccess() {
+        if (!canUseUi()) return
         when (currentUserRole) {
             "Super Admin" -> {
                 fabBroadcast.visibility = View.VISIBLE
-                tvBroadcastAccess.visibility = View.VISIBLE
-                tvBroadcastAccess.text = getString(R.string.alerts_broadcast_access_super)
-                tvAlertSubtitle.text = getString(R.string.alerts_subtitle_super)
             }
 
             "Department Admin" -> {
                 if (isSupportedDepartment(currentUserDepartment)) {
                     fabBroadcast.visibility = View.VISIBLE
-                    tvBroadcastAccess.visibility = View.VISIBLE
-                    tvBroadcastAccess.text = getString(
-                        R.string.alerts_broadcast_access_department,
-                        currentUserDepartment
-                    )
-                    tvAlertSubtitle.text = getString(R.string.alerts_subtitle_department)
                 } else {
                     fabBroadcast.visibility = View.GONE
-                    tvBroadcastAccess.visibility = View.VISIBLE
-                    tvBroadcastAccess.text = getString(R.string.alerts_broadcast_locked_invalid_department)
-                    tvAlertSubtitle.text = getString(R.string.alerts_subtitle_default)
                 }
             }
 
             else -> {
                 fabBroadcast.visibility = View.GONE
-                tvBroadcastAccess.visibility = View.GONE
-                tvAlertSubtitle.text = getString(R.string.alerts_subtitle_default)
             }
         }
     }
 
+    // Marks every alert as read from the toolbar action.
+    fun markAllReadFromToolbar() {
+        if (!canUseUi()) return
+        AlertStorage.markAllRead(requireContext())
+        refreshAlerts()
+    }
+
+    // Shows a rounded grey helper label above the broadcast button.
+    private fun showBroadcastTooltip(anchor: View) {
+        if (!canUseUi()) return
+
+        dismissBroadcastTooltip()
+
+        val tooltipView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.view_broadcast_tooltip, null, false)
+
+        val popupWindow = PopupWindow(
+            tooltipView,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            false
+        ).apply {
+            isOutsideTouchable = true
+            elevation = 10f
+        }
+
+        tooltipView.measure(
+            View.MeasureSpec.UNSPECIFIED,
+            View.MeasureSpec.UNSPECIFIED
+        )
+
+        val xOffset = (anchor.width - tooltipView.measuredWidth) / 2
+        val yOffset = -(tooltipView.measuredHeight + anchor.height + 18)
+
+        popupWindow.showAsDropDown(anchor, xOffset, yOffset, Gravity.START)
+        broadcastTooltip = popupWindow
+
+        anchor.postDelayed({
+            dismissBroadcastTooltip()
+        }, 1600)
+    }
+
+    // Hides the helper label if it is already visible.
+    private fun dismissBroadcastTooltip() {
+        broadcastTooltip?.dismiss()
+        broadcastTooltip = null
+    }
+
     // Opens the broadcast dialog.
     private fun showBroadcastDialog() {
+        if (!canUseUi()) return
         if (currentUserRole != "Super Admin" && currentUserRole != "Department Admin") {
             Toast.makeText(requireContext(), getString(R.string.alerts_broadcast_admin_only), Toast.LENGTH_SHORT).show()
             return
@@ -197,6 +228,8 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
         val etBody = dialogView.findViewById<EditText>(R.id.etBroadcastBody)
         val tilTitle = dialogView.findViewById<TextInputLayout>(R.id.tilBroadcastTitle)
         val tilBody = dialogView.findViewById<TextInputLayout>(R.id.tilBroadcastBody)
+        val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnBroadcastCancel)
+        val btnSend = dialogView.findViewById<MaterialButton>(R.id.btnBroadcastSend)
 
         if (currentUserRole == "Super Admin") {
             tilDepartment.visibility = View.VISIBLE
@@ -226,59 +259,60 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
 
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogView)
-            .setNegativeButton(R.string.common_cancel, null)
-            .setPositiveButton(R.string.common_send, null)
             .create()
 
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val title = etTitle.text.toString().trim()
-                val body = etBody.text.toString().trim()
-                val targetDepartment = if (currentUserRole == "Super Admin") {
-                    normalizeDepartment(actDepartment.text.toString())
-                        .ifBlank { "All Departments" }
-                } else {
-                    currentUserDepartment
-                }
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
 
-                tilTitle.error = null
-                tilBody.error = null
-                tilDepartment.error = null
-
-                if (title.isBlank()) {
-                    tilTitle.error = getString(R.string.alerts_enter_title)
-                    return@setOnClickListener
-                }
-
-                if (body.isBlank()) {
-                    tilBody.error = getString(R.string.alerts_enter_message)
-                    return@setOnClickListener
-                }
-
-                if (currentUserRole == "Super Admin" && targetDepartment.isBlank()) {
-                    tilDepartment.error = getString(R.string.alerts_choose_target_department)
-                    return@setOnClickListener
-                }
-
-                if (targetDepartment != "All Departments" && !isSupportedDepartment(targetDepartment)) {
-                    if (currentUserRole == "Super Admin") {
-                        tilDepartment.error = getString(R.string.alerts_choose_supported_department)
-                    } else {
-                        Toast.makeText(requireContext(), getString(R.string.alerts_invalid_department_account), Toast.LENGTH_SHORT).show()
-                    }
-                    return@setOnClickListener
-                }
-
-                sendBroadcastMessage(
-                    title = title,
-                    body = body,
-                    targetDepartment = targetDepartment,
-                    dialog = dialog
-                )
+        btnSend.setOnClickListener {
+            val title = etTitle.text.toString().trim()
+            val body = etBody.text.toString().trim()
+            val targetDepartment = if (currentUserRole == "Super Admin") {
+                normalizeDepartment(actDepartment.text.toString())
+                    .ifBlank { "All Departments" }
+            } else {
+                currentUserDepartment
             }
+
+            tilTitle.error = null
+            tilBody.error = null
+            tilDepartment.error = null
+
+            if (title.isBlank()) {
+                tilTitle.error = getString(R.string.alerts_enter_title)
+                return@setOnClickListener
+            }
+
+            if (body.isBlank()) {
+                tilBody.error = getString(R.string.alerts_enter_message)
+                return@setOnClickListener
+            }
+
+            if (currentUserRole == "Super Admin" && targetDepartment.isBlank()) {
+                tilDepartment.error = getString(R.string.alerts_choose_target_department)
+                return@setOnClickListener
+            }
+
+            if (targetDepartment != "All Departments" && !isSupportedDepartment(targetDepartment)) {
+                if (currentUserRole == "Super Admin") {
+                    tilDepartment.error = getString(R.string.alerts_choose_supported_department)
+                } else {
+                    Toast.makeText(requireContext(), getString(R.string.alerts_invalid_department_account), Toast.LENGTH_SHORT).show()
+                }
+                return@setOnClickListener
+            }
+
+            sendBroadcastMessage(
+                title = title,
+                body = body,
+                targetDepartment = targetDepartment,
+                dialog = dialog
+            )
         }
 
         dialog.show()
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
     }
 
     // Sends the broadcast message.
@@ -306,6 +340,7 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
             .child(pushKey)
             .setValue(message)
             .addOnSuccessListener {
+                if (!canUseUi()) return@addOnSuccessListener
                 val audienceLabel = if (targetDepartment == "All Departments") {
                     "all civilians"
                 } else {
@@ -327,8 +362,14 @@ class AlertsFragment : Fragment(R.layout.fragment_alerts) {
                 dialog.dismiss()
             }
             .addOnFailureListener { error ->
+                if (!canUseUi()) return@addOnFailureListener
                 Toast.makeText(requireContext(), error.message ?: getString(R.string.alerts_broadcast_failed), Toast.LENGTH_SHORT).show()
             }
+    }
+
+    // This tells the fragment whether it is still safe to touch UI or context.
+    private fun canUseUi(): Boolean {
+        return isAdded && isViewReady
     }
 
     // Normalizes department names.

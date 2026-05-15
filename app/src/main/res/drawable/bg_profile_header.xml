@@ -4,5 +4,5 @@
     <gradient
         android:angle="315"
         android:endColor="#0B4CC2"
-        android:startColor="#63A3FF" />
+        android:startColor="@color/profile_header_start" />
 </shape>

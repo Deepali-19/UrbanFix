@@ -3,19 +3,25 @@ package com.example.urban.bottomNavigation
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.widget.Toast
 import android.widget.ImageView
 import android.widget.TextView
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.content.res.AppCompatResources
-import androidx.core.content.ContextCompat
+import androidx.core.view.GravityCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
-import androidx.core.view.GravityCompat
+import androidx.fragment.app.FragmentManager
+import androidx.lifecycle.Lifecycle
+import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
 import com.example.urban.AppLocaleManager
 import com.example.urban.R
@@ -24,17 +30,22 @@ import com.example.urban.bottomNavigation.alert.AlertNotifier
 import com.example.urban.bottomNavigation.alert.AlertItem
 import com.example.urban.bottomNavigation.alert.AlertStorage
 import com.example.urban.bottomNavigation.complaint.Complaint
+import com.example.urban.bottomNavigation.complaint.ComplaintDetailFragment
 import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
 import com.example.urban.bottomNavigation.complaint.ComplaintFragment
 import com.example.urban.bottomNavigation.complaint.ComplaintSnapshotParser
 import com.example.urban.bottomNavigation.drawer.FO.FieldOfficerFragment
+import com.example.urban.bottomNavigation.drawer.FO.OfficerDetailFragment
 import com.example.urban.bottomNavigation.home.HomeFragment
 import com.example.urban.bottomNavigation.map.MapFragment
 import com.example.urban.bottomNavigation.profile.ProfileFragment
+import com.example.urban.loginSingUp.AppLockManager
 import com.example.urban.loginSingUp.LoginActivity
 import com.example.urban.loginSingUp.SessionManager
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.badge.BadgeDrawable
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.ChildEventListener
@@ -49,6 +60,10 @@ class DashboardActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_OPEN_ALERTS = "open_alerts"
+        private const val MENU_MARK_ALL_READ = 1001
+        private const val PREF_BADGE_STATE = "bottom_nav_badges"
+        private const val KEY_ALERT_DOT = "alert_dot"
+        private const val KEY_COMPLAINT_DOT = "complaint_dot"
     }
 
     private lateinit var bottomNav: BottomNavigationView
@@ -59,6 +74,8 @@ class DashboardActivity : AppCompatActivity() {
     private var currentFragment: Fragment? = null
     private var isFreshLaunch = false
     private var openAlertsFromIntent = false
+    private var pendingDestinationId: Int? = null
+    private var isUnlockPromptShowing = false
     private var adminMessageListener: ChildEventListener? = null
     private var adminMessageRef: DatabaseReference? = null
     private var complaintListener: ChildEventListener? = null
@@ -74,6 +91,15 @@ class DashboardActivity : AppCompatActivity() {
     private var currentUserDepartment = ""
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private val appLockLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            isUnlockPromptShowing = false
+            if (result.resultCode == RESULT_OK) {
+                SessionManager.markUnlocked(this)
+            } else {
+                moveTaskToBack(true)
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppLocaleManager.applySavedLocale(this)
@@ -90,40 +116,43 @@ class DashboardActivity : AppCompatActivity() {
         // Keep the colored icons as they are.
         bottomNav.itemIconTintList = null
         bottomNav.itemTextColor = AppCompatResources.getColorStateList(this, R.color.bottom_nav_icon_color)
+        bottomNav.itemActiveIndicatorColor = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.bottom_nav_active_indicator))
+        refreshBottomNavBadges()
 
         setSupportActionBar(toolbar)
+        applyPhoneNavigationBarStyle()
         AlertNotifier.ensureChannel(this)
         requestNotificationPermissionIfNeeded()
         SessionManager.refreshActivity(this)
 
         bottomNav.setOnItemSelectedListener {
-            when (it.itemId) {
-                R.id.nav_home -> loadFragment(HomeFragment())
-                R.id.nav_complaints -> loadFragment(ComplaintFragment())
-                R.id.nav_map -> loadFragment(MapFragment())
-                R.id.nav_alerts -> loadFragment(AlertsFragment())
-                R.id.nav_profile -> loadFragment(ProfileFragment())
-            }
+            openDestination(it.itemId)
             true
         }
 
         toolbar.setNavigationOnClickListener {
-            if (currentFragment is HomeFragment) {
-                drawerLayout.openDrawer(GravityCompat.START)
+            when (currentFragment) {
+                is HomeFragment -> drawerLayout.openDrawer(GravityCompat.START)
+                is FieldOfficerFragment -> bottomNav.selectedItemId = R.id.nav_home
+                is OfficerDetailFragment,
+                is ComplaintDetailFragment -> handleToolbarBack()
             }
         }
 
+        supportFragmentManager.addOnBackStackChangedListener {
+            syncToolbarWithCurrentFragment()
+        }
+
         navDrawer.setNavigationItemSelectedListener {
-
             when (it.itemId) {
-
                 R.id.nav_officers -> {
-                    loadFragment(FieldOfficerFragment())
+                    openDestination(R.id.nav_officers)
                 }
             }
 
             drawerLayout.closeDrawer(GravityCompat.START)
-            true}
+            true
+        }
 
         loadDrawerUserData()
         fixOldUserData()
@@ -133,36 +162,225 @@ class DashboardActivity : AppCompatActivity() {
 
     // Opens the selected screen and updates drawer state.
     private fun loadFragment(fragment: Fragment) {
+        if (!canNavigateNow()) return
+
+        clearSecondaryBackStack()
         currentFragment = fragment
 
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragmentContainer, fragment)
             .commit()
 
-        if (fragment is HomeFragment) {
-            toolbar.setNavigationIcon(R.drawable.navi_drawer)
-            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-        } else {
-            toolbar.navigationIcon = null
-            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-        }
-
-        when (fragment) {
-            is HomeFragment -> toolbar.title = getString(R.string.toolbar_dashboard)
-            is ProfileFragment -> toolbar.title = getString(R.string.toolbar_profile)
-            is ComplaintFragment -> toolbar.title = getString(R.string.toolbar_complaints)
-            is AlertsFragment -> toolbar.title = getString(R.string.toolbar_notifications)
-            is MapFragment -> toolbar.title = getString(R.string.toolbar_map)
-            is FieldOfficerFragment -> toolbar.title = getString(R.string.toolbar_field_officers)
-        }
-
+        updateToolbarForFragment(fragment)
         invalidateOptionsMenu()
     }
-override fun onCreateOptionsMenu(menu: Menu): Boolean {
 
-    menu.clear()
-    return true
-}
+    // This keeps the phone navigation bar in the light Azure shade across the app.
+    private fun applyPhoneNavigationBarStyle() {
+        window.navigationBarColor = ContextCompat.getColor(this, R.color.phone_navigation_bar_color)
+        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightNavigationBars = false
+    }
+
+    // This updates the toolbar and status bar colors for the active screen.
+    private fun applyTopBarStyle(fragment: Fragment) {
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+
+        if (fragment is ProfileFragment) {
+            toolbar.visibility = View.GONE
+            toolbar.setBackgroundResource(R.drawable.bg_profile_header)
+            toolbar.setTitleTextColor(ContextCompat.getColor(this, android.R.color.white))
+            window.statusBarColor = ContextCompat.getColor(this, R.color.profile_header_start)
+            controller.isAppearanceLightStatusBars = false
+        } else {
+            toolbar.visibility = View.VISIBLE
+            toolbar.setBackgroundColor(ContextCompat.getColor(this, R.color.app_bar_color))
+            toolbar.setTitleTextColor(ContextCompat.getColor(this, R.color.toolbar_text_dark))
+            window.statusBarColor = ContextCompat.getColor(this, R.color.status_bar_color)
+            controller.isAppearanceLightStatusBars = true
+        }
+    }
+
+    // This opens a screen by menu id and safely waits if the activity state is already saved.
+    private fun openDestination(destinationId: Int) {
+        if (!canNavigateNow()) {
+            pendingDestinationId = destinationId
+            return
+        }
+
+        pendingDestinationId = null
+
+        when (destinationId) {
+            R.id.nav_alerts -> clearAlertDot()
+            R.id.nav_complaints -> clearComplaintDot()
+        }
+
+        when (destinationId) {
+            R.id.nav_home -> loadFragment(HomeFragment())
+            R.id.nav_complaints -> loadFragment(ComplaintFragment())
+            R.id.nav_map -> loadFragment(MapFragment())
+            R.id.nav_alerts -> loadFragment(AlertsFragment())
+            R.id.nav_profile -> loadFragment(ProfileFragment())
+            R.id.nav_officers -> loadFragment(FieldOfficerFragment())
+        }
+    }
+
+    // This updates the toolbar after back stack changes from child screens.
+    private fun syncToolbarWithCurrentFragment() {
+        val visibleFragment = supportFragmentManager.findFragmentById(R.id.fragmentContainer) ?: return
+        currentFragment = visibleFragment
+        updateToolbarForFragment(visibleFragment)
+        invalidateOptionsMenu()
+    }
+
+    // This sets the correct title and left icon for root and sub pages.
+    private fun updateToolbarForFragment(fragment: Fragment) {
+        when (fragment) {
+            is HomeFragment -> {
+                toolbar.setNavigationIcon(R.drawable.navi_drawer)
+                toolbar.title = getString(R.string.toolbar_dashboard)
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+            }
+            is FieldOfficerFragment -> {
+                toolbar.setNavigationIcon(R.drawable.ic_toolbar_back)
+                toolbar.title = getString(R.string.toolbar_field_officers)
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            }
+            is OfficerDetailFragment -> {
+                toolbar.setNavigationIcon(R.drawable.ic_toolbar_back)
+                toolbar.title = getString(R.string.toolbar_officer_detail)
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            }
+            is ComplaintDetailFragment -> {
+                toolbar.setNavigationIcon(R.drawable.ic_toolbar_back)
+                toolbar.title = getString(R.string.toolbar_complaint_detail)
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            }
+            is ProfileFragment -> {
+                toolbar.navigationIcon = null
+                toolbar.title = ""
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            }
+            is ComplaintFragment -> {
+                toolbar.navigationIcon = null
+                toolbar.title = getString(R.string.toolbar_complaints)
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            }
+            is AlertsFragment -> {
+                toolbar.navigationIcon = null
+                toolbar.title = getString(R.string.toolbar_notifications)
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            }
+            is MapFragment -> {
+                toolbar.navigationIcon = null
+                toolbar.title = getString(R.string.toolbar_map)
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            }
+            else -> {
+                toolbar.navigationIcon = null
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            }
+        }
+
+        applyTopBarStyle(fragment)
+    }
+
+    // This handles the shared toolbar back action for deeper pages.
+    private fun handleToolbarBack() {
+        if (supportFragmentManager.backStackEntryCount > 0 && !supportFragmentManager.isStateSaved) {
+            supportFragmentManager.popBackStack()
+            return
+        }
+
+        when (currentFragment) {
+            is FieldOfficerFragment,
+            is OfficerDetailFragment -> bottomNav.selectedItemId = R.id.nav_home
+            is ComplaintDetailFragment -> bottomNav.selectedItemId = R.id.nav_complaints
+        }
+    }
+
+    // This clears old sub-page history when the user opens a root screen.
+    private fun clearSecondaryBackStack() {
+        if (supportFragmentManager.isStateSaved) return
+        supportFragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
+    }
+
+    // This decides whether fragment navigation is safe right now.
+    private fun canNavigateNow(): Boolean {
+        return !isFinishing &&
+            !isDestroyed &&
+            lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
+            !supportFragmentManager.isStateSaved
+    }
+
+    // This runs any delayed navigation once the activity is active again.
+    private fun processPendingNavigation() {
+        val destinationId = pendingDestinationId ?: return
+        if (!canNavigateNow()) return
+
+        pendingDestinationId = null
+        if (isBottomNavDestination(destinationId)) {
+            if (bottomNav.selectedItemId != destinationId) {
+                bottomNav.selectedItemId = destinationId
+            } else {
+                openDestination(destinationId)
+            }
+        } else {
+            openDestination(destinationId)
+        }
+    }
+
+    // This checks whether a menu id belongs to the bottom navigation bar.
+    private fun isBottomNavDestination(destinationId: Int): Boolean {
+        return destinationId == R.id.nav_home ||
+            destinationId == R.id.nav_complaints ||
+            destinationId == R.id.nav_map ||
+            destinationId == R.id.nav_alerts ||
+            destinationId == R.id.nav_profile
+    }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        processPendingNavigation()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+
+        menu.clear()
+        return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        menu.clear()
+
+        if (currentFragment is AlertsFragment) {
+            addAlertToolbarButton(
+                menu = menu,
+                itemId = MENU_MARK_ALL_READ,
+                text = getString(R.string.alerts_mark_read_short)
+            ) {
+                (currentFragment as? AlertsFragment)?.markAllReadFromToolbar()
+            }
+        }
+
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    // Adds one rounded toolbar button for the alerts screen actions.
+    private fun addAlertToolbarButton(
+        menu: Menu,
+        itemId: Int,
+        text: String,
+        onClick: () -> Unit
+    ) {
+        val item = menu.add(Menu.NONE, itemId, Menu.NONE, text)
+        item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+
+        val button = LayoutInflater.from(this)
+            .inflate(R.layout.toolbar_alert_action_button, toolbar, false) as MaterialButton
+        button.text = text
+        button.setOnClickListener { onClick() }
+        item.actionView = button
+    }
 
     // Loads the current user role and department.
     private fun fetchUserRole() {
@@ -176,6 +394,8 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
             .child(uid)
             .get()
             .addOnSuccessListener {
+                if (isFinishing || isDestroyed) return@addOnSuccessListener
+
                 val role = resolveRole(it.child("role").value?.toString())
                 val department = it.child("department").value?.toString().orEmpty()
                 currentUserRole = role
@@ -222,7 +442,16 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
             R.id.nav_home
         }
 
-        bottomNav.selectedItemId = defaultItemId
+        if (canNavigateNow()) {
+            if (bottomNav.selectedItemId != defaultItemId) {
+                bottomNav.selectedItemId = defaultItemId
+            } else {
+                openDestination(defaultItemId)
+            }
+        } else {
+            pendingDestinationId = defaultItemId
+        }
+
         openAlertsFromIntent = false
     }
 
@@ -337,13 +566,16 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         ref.get()
             .addOnSuccessListener { snapshot ->
                 knownComplaintKeys.clear()
-                snapshot.children.mapNotNullTo(knownComplaintKeys) { it.key }
                 knownComplaintAssignments.clear()
-                snapshot.children.forEach { child ->
-                    val complaintKey = child.key.orEmpty()
-                    if (complaintKey.isBlank()) return@forEach
-                    val assignedOfficerId = child.child("allottedOfficerId").value?.toString().orEmpty()
-                    knownComplaintAssignments[complaintKey] = assignedOfficerId
+
+                ComplaintSnapshotParser.complaintSnapshots(snapshot).forEach { complaintSnapshot ->
+                    val complaintPath = complaintSnapshot.ref.path.toString()
+                    if (complaintPath.isBlank()) return@forEach
+
+                    knownComplaintKeys.add(complaintPath)
+
+                    val complaint = ComplaintSnapshotParser.fromSnapshot(complaintSnapshot) ?: return@forEach
+                    knownComplaintAssignments[complaintPath] = complaint.allottedOfficerId.trim()
                 }
                 attachComplaintListener(ref)
             }
@@ -359,34 +591,35 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
 
         complaintListener = object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
-                val complaintKey = snapshot.key.orEmpty()
-                if (complaintKey.isNotBlank() && !knownComplaintKeys.add(complaintKey)) return
+                ComplaintSnapshotParser.complaintSnapshots(snapshot).forEach { complaintSnapshot ->
+                    val complaintPath = complaintSnapshot.ref.path.toString()
+                    if (complaintPath.isNotBlank() && !knownComplaintKeys.add(complaintPath)) return@forEach
 
-                val complaint = ComplaintSnapshotParser.fromSnapshot(snapshot) ?: return
+                    val complaint = ComplaintSnapshotParser.fromSnapshot(complaintSnapshot) ?: return@forEach
+                    knownComplaintAssignments[complaintPath] = complaint.allottedOfficerId.trim()
 
-                knownComplaintAssignments[complaintKey] = complaint.allottedOfficerId.trim()
+                    when (currentUserRole) {
+                        "Super Admin", "Department Admin" -> {
+                            if (!shouldNotifyForComplaint(complaint)) return@forEach
 
-                when (currentUserRole) {
-                    "Super Admin", "Department Admin" -> {
-                        if (!shouldNotifyForComplaint(complaint)) return
+                            val alert = buildComplaintAlert(complaintSnapshot, complaint)
+                            val eventKey = "new_report:${alert.complaintKey.ifBlank { complaintPath }}"
+                            if (!shouldDispatchLiveAlert(eventKey)) return@forEach
 
-                        val alert = buildComplaintAlert(snapshot, complaint)
-                        val eventKey = "new_report:${alert.complaintKey.ifBlank { complaintKey }}"
-                        if (!shouldDispatchLiveAlert(eventKey)) return
+                            dispatchAlert(alert)
+                        }
 
-                        dispatchAlert(alert)
-                    }
+                        "Field Officer" -> {
+                            val currentUserId = auth.currentUser?.uid.orEmpty()
+                            if (currentUserId.isBlank()) return@forEach
+                            if (!complaint.allottedOfficerId.trim().equals(currentUserId, ignoreCase = false)) return@forEach
 
-                    "Field Officer" -> {
-                        val currentUserId = auth.currentUser?.uid.orEmpty()
-                        if (currentUserId.isBlank()) return
-                        if (!complaint.allottedOfficerId.trim().equals(currentUserId, ignoreCase = false)) return
+                            val alert = buildAssignmentAlert(complaintSnapshot, complaint)
+                            val eventKey = "assignment:${alert.complaintKey.ifBlank { complaintPath }}"
+                            if (!shouldDispatchLiveAlert(eventKey)) return@forEach
 
-                        val alert = buildAssignmentAlert(snapshot, complaint)
-                        val eventKey = "assignment:${alert.complaintKey.ifBlank { complaintKey }}"
-                        if (!shouldDispatchLiveAlert(eventKey)) return
-
-                        dispatchAlert(alert)
+                            dispatchAlert(alert)
+                        }
                     }
                 }
             }
@@ -394,28 +627,30 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
             override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
                 if (currentUserRole != "Field Officer") return
 
-                val complaintKey = snapshot.key.orEmpty()
-                if (complaintKey.isBlank()) return
+                ComplaintSnapshotParser.complaintSnapshots(snapshot).forEach { complaintSnapshot ->
+                    val complaintPath = complaintSnapshot.ref.path.toString()
+                    if (complaintPath.isBlank()) return@forEach
 
-                val complaint = ComplaintSnapshotParser.fromSnapshot(snapshot) ?: return
+                    val complaint = ComplaintSnapshotParser.fromSnapshot(complaintSnapshot) ?: return@forEach
 
-                val previousOfficerId = knownComplaintAssignments[complaintKey].orEmpty()
-                val currentOfficerId = complaint.allottedOfficerId.trim()
-                knownComplaintAssignments[complaintKey] = currentOfficerId
+                    val previousOfficerId = knownComplaintAssignments[complaintPath].orEmpty()
+                    val currentOfficerId = complaint.allottedOfficerId.trim()
+                    knownComplaintAssignments[complaintPath] = currentOfficerId
 
-                val currentUserId = auth.currentUser?.uid.orEmpty()
-                if (currentUserId.isBlank()) return
+                    val currentUserId = auth.currentUser?.uid.orEmpty()
+                    if (currentUserId.isBlank()) return@forEach
 
-                val wasAssignedToCurrentUser = previousOfficerId == currentUserId
-                val isAssignedToCurrentUser = currentOfficerId == currentUserId
+                    val wasAssignedToCurrentUser = previousOfficerId == currentUserId
+                    val isAssignedToCurrentUser = currentOfficerId == currentUserId
 
-                if (wasAssignedToCurrentUser || !isAssignedToCurrentUser) return
+                    if (wasAssignedToCurrentUser || !isAssignedToCurrentUser) return@forEach
 
-                val alert = buildAssignmentAlert(snapshot, complaint)
-                val eventKey = "assignment:${alert.complaintKey.ifBlank { complaintKey }}"
-                if (!shouldDispatchLiveAlert(eventKey)) return
+                    val alert = buildAssignmentAlert(complaintSnapshot, complaint)
+                    val eventKey = "assignment:${alert.complaintKey.ifBlank { complaintPath }}"
+                    if (!shouldDispatchLiveAlert(eventKey)) return@forEach
 
-                dispatchAlert(alert)
+                    dispatchAlert(alert)
+                }
             }
 
             override fun onChildRemoved(snapshot: DataSnapshot) = Unit
@@ -492,6 +727,11 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
 
     private fun dispatchAlert(alert: AlertItem) {
         AlertStorage.addAlert(this, alert)
+        setAlertDotVisible(currentFragment !is AlertsFragment)
+        if (alert.complaintKey.isNotBlank()) {
+            val complaintScreenOpen = currentFragment is ComplaintFragment || currentFragment is ComplaintDetailFragment
+            setComplaintDotVisible(!complaintScreenOpen)
+        }
         AlertNotifier.show(this, alert)
         Toast.makeText(
             this,
@@ -499,6 +739,58 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
             Toast.LENGTH_LONG
         ).show()
     }
+
+    // Stores and draws the small red dots on bottom navigation icons.
+    private fun refreshBottomNavBadges() {
+        applyDotBadge(
+            itemId = R.id.nav_alerts,
+            visible = badgePrefs().getBoolean(KEY_ALERT_DOT, false)
+        )
+        applyDotBadge(
+            itemId = R.id.nav_complaints,
+            visible = badgePrefs().getBoolean(KEY_COMPLAINT_DOT, false)
+        )
+    }
+
+    // Shows or hides one dot badge on a bottom navigation item.
+    private fun applyDotBadge(itemId: Int, visible: Boolean) {
+        if (visible) {
+            val badge = bottomNav.getOrCreateBadge(itemId)
+            badge.backgroundColor = ContextCompat.getColor(this, android.R.color.holo_red_dark)
+            badge.badgeGravity = BadgeDrawable.TOP_END
+            badge.clearNumber()
+            badge.isVisible = true
+            badge.horizontalOffset = 6
+            badge.verticalOffset = 8
+        } else {
+            bottomNav.removeBadge(itemId)
+        }
+    }
+
+    // Saves the alert dot state.
+    private fun setAlertDotVisible(visible: Boolean) {
+        badgePrefs().edit().putBoolean(KEY_ALERT_DOT, visible).apply()
+        applyDotBadge(R.id.nav_alerts, visible)
+    }
+
+    // Saves the complaint dot state.
+    private fun setComplaintDotVisible(visible: Boolean) {
+        badgePrefs().edit().putBoolean(KEY_COMPLAINT_DOT, visible).apply()
+        applyDotBadge(R.id.nav_complaints, visible)
+    }
+
+    // Clears the alerts tab dot once the screen is opened.
+    private fun clearAlertDot() {
+        setAlertDotVisible(false)
+    }
+
+    // Clears the complaints tab dot once the list is opened.
+    private fun clearComplaintDot() {
+        setComplaintDotVisible(false)
+    }
+
+    // Shared preferences used for small tab-dot states.
+    private fun badgePrefs() = getSharedPreferences(PREF_BADGE_STATE, MODE_PRIVATE)
 
     private fun stopAdminMessageListener() {
         val ref = adminMessageRef
@@ -634,17 +926,21 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
             return
         }
 
-        if (SessionManager.isExpired(this)) {
-            redirectToLogin(sessionExpired = true)
-            return
-        }
-
         SessionManager.refreshActivity(this)
     }
 
-    override fun onPause() {
-        super.onPause()
-        SessionManager.markBackgrounded(this)
+    // Shows phone security when the app is reopened after going to background.
+    override fun onStart() {
+        super.onStart()
+        if (auth.currentUser == null) return
+        promptForAppUnlockIfNeeded()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations && !isFinishing && !isUnlockPromptShowing) {
+            SessionManager.markBackgrounded(this)
+        }
     }
 
     override fun onUserInteraction() {
@@ -656,6 +952,21 @@ override fun onCreateOptionsMenu(menu: Menu): Boolean {
         super.onDestroy()
         stopAdminMessageListener()
         stopComplaintListener()
+    }
+
+    // Opens biometric or phone lock when the user comes back to the app.
+    private fun promptForAppUnlockIfNeeded() {
+        if (!SessionManager.isAppLockRequired(this)) return
+        if (isUnlockPromptShowing) return
+
+        val unlockIntent = AppLockManager.createUnlockIntent(this)
+        if (unlockIntent == null) {
+            SessionManager.markUnlocked(this)
+            return
+        }
+
+        isUnlockPromptShowing = true
+        appLockLauncher.launch(unlockIntent)
     }
 
 }

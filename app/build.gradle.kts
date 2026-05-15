@@ -64,6 +64,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         resValue("string", "google_maps_key", quoted(mapsApiKey))
+        buildConfigField("String", "MAPS_API_KEY", quoted(mapsApiKey))
         buildConfigField("String", "APPWRITE_ENDPOINT", quoted(appwriteEndpoint))
         buildConfigField("String", "APPWRITE_PROJECT_ID", quoted(appwriteProjectId))
         buildConfigField("String", "APPWRITE_BUCKET_ID", quoted(appwriteBucketId))

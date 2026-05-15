@@ -201,6 +201,7 @@
                         android:hint="@string/signup_select_role"
                         android:inputType="none"
                         android:minHeight="56dp"
+                        android:popupBackground="@drawable/bg_signup_dropdown_popup"
                         android:textSize="15sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -221,6 +222,7 @@
                         android:hint="@string/signup_select_department"
                         android:inputType="none"
                         android:minHeight="56dp"
+                        android:popupBackground="@drawable/bg_signup_dropdown_popup"
                         android:textSize="15sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -230,14 +232,19 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
                     app:boxBackgroundMode="outline"
+                    app:endIconMode="dropdown_menu"
                     app:startIconDrawable="@drawable/location"
                     app:startIconTint="#6B7280">
 
-                    <com.google.android.material.textfield.TextInputEditText
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/actCity"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:completionThreshold="1"
                         android:hint="@string/signup_city"
+                        android:inputType="textCapWords"
                         android:minHeight="56dp"
+                        android:popupBackground="@drawable/bg_signup_dropdown_popup"
                         android:textSize="15sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -271,6 +278,63 @@
                     app:icon="@drawable/id_card"
                     app:iconPadding="10dp"
                     app:iconTint="#0B4CC2" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardUploadedIdInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="#F8FBFF"
+                    app:cardCornerRadius="18dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="#D7E7F9"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="14dp"
+                        android:paddingTop="12dp"
+                        android:paddingEnd="14dp"
+                        android:paddingBottom="12dp">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/id_card"
+                            app:tint="#0B4CC2" />
+
+                        <TextView
+                            android:id="@+id/tvUploadedIdName"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:ellipsize="end"
+                            android:maxLines="2"
+                            android:text="@string/signup_id_selected_placeholder"
+                            android:textColor="#0F172A"
+                            android:textSize="14sp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnViewUploadedId"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:minHeight="40dp"
+                            android:text="@string/signup_view_uploaded_id"
+                            android:textAllCaps="false"
+                            android:textColor="#0B4CC2"
+                            app:cornerRadius="14dp"
+                            app:strokeColor="#0B4CC2"
+                            app:strokeWidth="1dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnCreateAccount"
