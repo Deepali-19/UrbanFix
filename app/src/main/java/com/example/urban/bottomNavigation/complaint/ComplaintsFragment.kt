@@ -61,6 +61,7 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
     private var currentRole = ""
     private var currentDepartment = ""
+    private var currentCityNormalized = ""
     private var currentUid = ""
     private var hasLoadedComplaints = false
     private var pendingStatusFilter: String? = null
@@ -162,6 +163,10 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
             currentRole = userSnap.child("role").value.toString()
             currentDepartment = userSnap.child("department").value.toString()
+            currentCityNormalized = ComplaintDataFormatter.normalizeCity(
+                userSnap.child("cityNormalized").value?.toString().orEmpty()
+                    .ifBlank { userSnap.child("city").value?.toString().orEmpty() }
+            )
             adapter.showUnreadIndicator = currentRole != "Field Officer"
 
             val ref = db.child("Complaints")
@@ -203,14 +208,13 @@ class ComplaintFragment : Fragment(R.layout.fragment_complaints) {
 
     // This checks whether one complaint should appear for the logged-in role.
     private fun shouldIncludeComplaint(complaint: Complaint): Boolean {
-        return when (currentRole) {
-            "Super Admin" -> true
-            "Department Admin" -> {
-                ComplaintDataFormatter.resolvedDepartment(complaint) == normalizeDepartment(currentDepartment)
-            }
-            "Field Officer" -> complaint.allottedOfficerId == currentUid
-            else -> false
-        }
+        return ComplaintDataFormatter.isVisibleToUser(
+            complaint = complaint,
+            role = currentRole,
+            userDepartment = currentDepartment,
+            userCityNormalized = currentCityNormalized,
+            userUid = currentUid
+        )
     }
 
     // This recalculates ETA for visible complaints so admin users always see fresh estimates.

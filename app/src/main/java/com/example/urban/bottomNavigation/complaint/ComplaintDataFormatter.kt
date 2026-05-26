@@ -2,6 +2,7 @@ package com.example.urban.bottomNavigation.complaint
 
 import android.content.Context
 import com.example.urban.R
+import com.example.urban.loginSingUp.AccountApprovalManager
 
 object ComplaintDataFormatter {
 
@@ -72,6 +73,63 @@ object ComplaintDataFormatter {
             "sanitation", "sanitisation" -> "Sanitation"
             "electricity", "electric" -> "Electricity"
             else -> value.trim().takeIf { it.isNotBlank() }
+        }
+    }
+
+    // This keeps complaint and user city matching stable across direct city fields and older location-only records.
+    fun normalizeCity(value: String): String {
+        return AccountApprovalManager.normalizeCity(value)
+    }
+
+    // This returns the complaint city when stored directly, otherwise it falls back to location text matching.
+    fun resolvedCityNormalized(complaint: Complaint): String {
+        complaint.cityNormalized.takeIf { it.isNotBlank() }?.let {
+            return normalizeCity(it)
+        }
+
+        complaint.city.takeIf { it.isNotBlank() }?.let {
+            return normalizeCity(it)
+        }
+
+        return ""
+    }
+
+    // This checks whether a complaint belongs to the current user's city.
+    fun matchesCity(complaint: Complaint, userCityNormalized: String): Boolean {
+        if (userCityNormalized.isBlank()) return true
+
+        val complaintCityNormalized = resolvedCityNormalized(complaint)
+        if (complaintCityNormalized.isNotBlank()) {
+            return complaintCityNormalized == userCityNormalized
+        }
+
+        val normalizedLocation = complaint.location.trim()
+            .lowercase()
+            .replace(Regex("[^a-z\\s]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+        if (normalizedLocation.isBlank()) return false
+        return normalizedLocation.contains(userCityNormalized)
+    }
+
+    // This applies one shared city-role visibility rule for complaints across the app.
+    fun isVisibleToUser(
+        complaint: Complaint,
+        role: String,
+        userDepartment: String,
+        userCityNormalized: String,
+        userUid: String
+    ): Boolean {
+        if (!matchesCity(complaint, userCityNormalized)) return false
+
+        return when (role) {
+            "Super Admin" -> true
+            "Department Admin" -> {
+                resolvedDepartment(complaint) == normalizeDepartment(userDepartment)
+            }
+            "Field Officer" -> complaint.allottedOfficerId == userUid
+            else -> false
         }
     }
 

@@ -22,8 +22,10 @@ import com.example.urban.AppLocaleManager
 import com.example.urban.R
 import com.example.urban.BuildConfig
 import com.example.urban.databinding.ActivitySingUpBinding
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,6 +37,15 @@ import java.io.FileOutputStream
 
 
 class SingUpActivity : AppCompatActivity() {
+
+    private data class SignupInput(
+        val name: String,
+        val email: String,
+        val password: String,
+        val role: String,
+        val department: String,
+        val city: String
+    )
 
     private lateinit var binding: ActivitySingUpBinding
     private lateinit var auth: FirebaseAuth
@@ -253,7 +264,6 @@ class SingUpActivity : AppCompatActivity() {
         val role = binding.actRole.text.toString().trim()
         val department = binding.actDepartment.text.toString().trim()
         val city = binding.actCity.text.toString().trim()
-        val employeeId = binding.tilEmployeeId.editText!!.text.toString().trim()
 
         if (name.isEmpty() || email.isEmpty() || password.isEmpty() || confirm.isEmpty()) {
             toast(getString(R.string.fill_required_fields))
@@ -270,7 +280,7 @@ class SingUpActivity : AppCompatActivity() {
             return
         }
 
-        if (city.isEmpty() || employeeId.isEmpty()) {
+        if (city.isEmpty()) {
             toast(getString(R.string.add_city_employee_id))
             return
         }
@@ -293,41 +303,273 @@ class SingUpActivity : AppCompatActivity() {
             return
         }
 
-        auth.createUserWithEmailAndPassword(email, password)
-            .addOnSuccessListener {
+        setSubmittingState(true)
 
-                val uid = auth.currentUser!!.uid
+        val input = SignupInput(
+            name = name,
+            email = email,
+            password = password,
+            role = role,
+            department = department,
+            city = city
+        )
 
-                val user = User(
-                    uid = uid,
-                    name = name,
-                    email = email,
-                    role = role,
-                    department = if (role == "Super Admin") "All Departments" else department,
-                    city = city,
-                    deviceToken = "",   // will update later from FCM
-                    latitude = 0.0,
-                    longitude = 0.0,
-                    createdAt = System.currentTimeMillis(),
-                    employeeId = employeeId,
-                    idProofUrl = uploadedImageUrl,
-                    profileImageUrl = ""
+        if (role == AccountApprovalManager.ROLE_SUPER_ADMIN) {
+            startSuperAdminSignup(input)
+        } else {
+            startCityApprovalSignup(input)
+        }
+    }
+
+    // This checks whether the city already has a super admin before creating a pending staff request.
+    private fun startCityApprovalSignup(input: SignupInput) {
+        database.child("Users")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val approver = findApprovedSuperAdmin(snapshot, input.city)
+                if (approver == null) {
+                    setSubmittingState(false)
+                    toast(getString(R.string.signup_no_super_admin_for_city))
+                    return@addOnSuccessListener
+                }
+
+                createPendingAccount(
+                    input = input,
+                    approvalRoute = AccountApprovalManager.ROUTE_CITY_SUPER_ADMIN,
+                    approverUid = approver.uid,
+                    approverEmail = approver.email
                 )
-
-                database.child("Users")
-                    .child(uid)
-                    .setValue(user)
-
-                auth.signOut()
-                SessionManager.clear(this)
-                toast(getString(R.string.account_created_successfully))
-
-                startActivity(Intent(this, LoginActivity::class.java))
-                finish()
             }
             .addOnFailureListener {
+                setSubmittingState(false)
                 toast(it.message ?: getString(R.string.signup_failed))
             }
+    }
+
+    // This creates a pending super admin request only when the city does not already have one.
+    private fun startSuperAdminSignup(input: SignupInput) {
+        database.child("Users")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                if (hasApprovedSuperAdmin(snapshot, input.city)) {
+                    setSubmittingState(false)
+                    toast(getString(R.string.signup_super_admin_exists))
+                    return@addOnSuccessListener
+                }
+
+                if (hasPendingSuperAdmin(snapshot, input.city)) {
+                    setSubmittingState(false)
+                    toast(getString(R.string.signup_super_admin_pending_exists))
+                    return@addOnSuccessListener
+                }
+
+                createPendingAccount(
+                    input = input,
+                    approvalRoute = AccountApprovalManager.ROUTE_ROOT_EMAIL,
+                    approverUid = "",
+                    approverEmail = AppConfig.rootApprovalEmail
+                )
+            }
+            .addOnFailureListener {
+                setSubmittingState(false)
+                toast(it.message ?: getString(R.string.signup_failed))
+            }
+    }
+
+    // This creates the auth account first, then saves it in Firebase as a pending request.
+    private fun createPendingAccount(
+        input: SignupInput,
+        approvalRoute: String,
+        approverUid: String,
+        approverEmail: String
+    ) {
+        auth.createUserWithEmailAndPassword(input.email, input.password)
+            .addOnSuccessListener {
+                val uid = auth.currentUser?.uid.orEmpty()
+                if (uid.isBlank()) {
+                    setSubmittingState(false)
+                    toast(getString(R.string.signup_failed))
+                    return@addOnSuccessListener
+                }
+
+                FirebaseMessaging.getInstance().token
+                    .addOnSuccessListener { token ->
+                        savePendingUserAndRequest(
+                            uid = uid,
+                            deviceToken = token.orEmpty(),
+                            input = input,
+                            approvalRoute = approvalRoute,
+                            approverUid = approverUid,
+                            approverEmail = approverEmail
+                        )
+                    }
+                    .addOnFailureListener {
+                        savePendingUserAndRequest(
+                            uid = uid,
+                            deviceToken = "",
+                            input = input,
+                            approvalRoute = approvalRoute,
+                            approverUid = approverUid,
+                            approverEmail = approverEmail
+                        )
+                    }
+            }
+            .addOnFailureListener {
+                setSubmittingState(false)
+                toast(it.message ?: getString(R.string.signup_failed))
+            }
+    }
+
+    // This saves the pending user and approval request records in Firebase.
+    private fun savePendingUserAndRequest(
+        uid: String,
+        deviceToken: String,
+        input: SignupInput,
+        approvalRoute: String,
+        approverUid: String,
+        approverEmail: String
+    ) {
+        val submittedAt = System.currentTimeMillis()
+        val normalizedCity = AccountApprovalManager.normalizeCity(input.city)
+        val resolvedDepartment = if (input.role == AccountApprovalManager.ROLE_SUPER_ADMIN) {
+            "All Departments"
+        } else {
+            input.department
+        }
+
+        val user = User(
+            uid = uid,
+            name = input.name,
+            email = input.email,
+            role = input.role,
+            department = resolvedDepartment,
+            city = input.city,
+            deviceToken = deviceToken,
+            latitude = 0.0,
+            longitude = 0.0,
+            createdAt = submittedAt,
+            employeeId = "",
+            idProofUrl = uploadedImageUrl,
+            profileImageUrl = "",
+            accountStatus = AccountApprovalManager.STATUS_PENDING,
+            approvalRoute = approvalRoute,
+            cityNormalized = normalizedCity,
+            requestedAt = submittedAt
+        )
+
+        val request = ApprovalRequest(
+            requestId = uid,
+            uid = uid,
+            name = input.name,
+            email = input.email,
+            role = input.role,
+            department = resolvedDepartment,
+            city = input.city,
+            cityNormalized = normalizedCity,
+            idProofUrl = uploadedImageUrl,
+            status = AccountApprovalManager.STATUS_PENDING,
+            approvalRoute = approvalRoute,
+            targetApproverUid = approverUid,
+            targetApproverEmail = approverEmail,
+            actionToken = UUID.randomUUID().toString().replace("-", ""),
+            submittedAt = submittedAt,
+            requesterDeviceToken = deviceToken
+        )
+
+        val updates = hashMapOf<String, Any>(
+            "/Users/$uid" to user,
+            "/ApprovalRequests/$uid" to request
+        )
+
+        if (approverEmail.isNotBlank()) {
+            updates["/ApprovalEmailQueue/$uid"] = mapOf(
+                "requestId" to uid,
+                "toEmail" to approverEmail,
+                "role" to input.role,
+                "name" to input.name,
+                "requesterEmail" to input.email,
+                "department" to resolvedDepartment,
+                "city" to input.city,
+                "idProofUrl" to uploadedImageUrl,
+                "actionToken" to request.actionToken,
+                "submittedAt" to submittedAt,
+                "approvalRoute" to approvalRoute
+            )
+        }
+
+        database.updateChildren(updates)
+            .addOnSuccessListener {
+                lifecycleScope.launch {
+                    if (approverEmail.isNotBlank() && ApprovalEmailSender.isConfigured()) {
+                        ApprovalEmailSender.sendApprovalRequestEmail(request)
+                    }
+
+                    auth.signOut()
+                    SessionManager.clear(this@SingUpActivity)
+                    setSubmittingState(false)
+                    toast(getString(R.string.signup_request_submitted))
+                    startActivity(Intent(this@SingUpActivity, LoginActivity::class.java))
+                    finish()
+                }
+            }
+            .addOnFailureListener {
+                auth.currentUser?.delete()
+                auth.signOut()
+                setSubmittingState(false)
+                toast(it.message ?: getString(R.string.signup_failed))
+            }
+    }
+
+    // This finds the approved super admin for the selected city.
+    private fun findApprovedSuperAdmin(snapshot: DataSnapshot, city: String): User? {
+        val normalizedCity = AccountApprovalManager.normalizeCity(city)
+        for (userSnapshot in snapshot.children) {
+            val user = userSnapshot.getValue(User::class.java) ?: continue
+            if (user.role != AccountApprovalManager.ROLE_SUPER_ADMIN) continue
+            if (AccountApprovalManager.effectiveStatus(user.accountStatus) != AccountApprovalManager.STATUS_APPROVED) continue
+
+            val userCity = user.cityNormalized.ifBlank { AccountApprovalManager.normalizeCity(user.city) }
+            if (userCity == normalizedCity) {
+                return user.copy(uid = userSnapshot.key.orEmpty())
+            }
+        }
+        return null
+    }
+
+    // This checks whether a city already has an approved super admin.
+    private fun hasApprovedSuperAdmin(snapshot: DataSnapshot, city: String): Boolean {
+        return findMatchingSuperAdmin(snapshot, city, AccountApprovalManager.STATUS_APPROVED)
+    }
+
+    // This checks whether a super admin request is already pending for the city.
+    private fun hasPendingSuperAdmin(snapshot: DataSnapshot, city: String): Boolean {
+        return findMatchingSuperAdmin(snapshot, city, AccountApprovalManager.STATUS_PENDING)
+    }
+
+    // This checks super admin records by city and status.
+    private fun findMatchingSuperAdmin(snapshot: DataSnapshot, city: String, status: String): Boolean {
+        val normalizedCity = AccountApprovalManager.normalizeCity(city)
+        for (userSnapshot in snapshot.children) {
+            val user = userSnapshot.getValue(User::class.java) ?: continue
+            if (user.role != AccountApprovalManager.ROLE_SUPER_ADMIN) continue
+            if (AccountApprovalManager.effectiveStatus(user.accountStatus) != status) continue
+
+            val userCity = user.cityNormalized.ifBlank { AccountApprovalManager.normalizeCity(user.city) }
+            if (userCity == normalizedCity) {
+                return true
+            }
+        }
+        return false
+    }
+
+    // This keeps the signup button state clear while the request is being saved.
+    private fun setSubmittingState(isSubmitting: Boolean) {
+        binding.btnCreateAccount.isEnabled = !isSubmitting
+        binding.btnCreateAccount.text = if (isSubmitting) {
+            getString(R.string.signup_submitting_request)
+        } else {
+            getString(R.string.signup_create_account)
+        }
     }
 
     // Uploads the ID proof image.

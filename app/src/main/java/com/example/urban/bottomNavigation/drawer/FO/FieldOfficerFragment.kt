@@ -7,6 +7,9 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.urban.R
+import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
+import com.example.urban.loginSingUp.AccountApprovalManager
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -23,6 +26,8 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
     private val list = ArrayList<FieldOfficer>()
     private lateinit var adapter: FieldOfficerAdapter
     private var isViewReady = false
+    private val auth = FirebaseAuth.getInstance()
+    private var currentUserCityNormalized = ""
 
     private val database = FirebaseDatabase.getInstance().reference
 
@@ -48,10 +53,33 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = adapter
 
-        loadOfficers()
+        loadCurrentUserCityAndOfficers()
     }
 
-    // Loads all field officers.
+    // Loads the current user's city first so the officer list stays inside the same city scope.
+    private fun loadCurrentUserCityAndOfficers() {
+        val currentUid = auth.currentUser?.uid ?: run {
+            loadOfficers()
+            return
+        }
+
+        database.child("Users").child(currentUid)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                if (!canUseUi()) return@addOnSuccessListener
+                currentUserCityNormalized = ComplaintDataFormatter.normalizeCity(
+                    snapshot.child("cityNormalized").value?.toString().orEmpty()
+                        .ifBlank { snapshot.child("city").value?.toString().orEmpty() }
+                )
+                loadOfficers()
+            }
+            .addOnFailureListener {
+                if (!canUseUi()) return@addOnFailureListener
+                loadOfficers()
+            }
+    }
+
+    // Loads all field officers visible to the current admin city.
     private fun loadOfficers() {
         showLoading(true)
 
@@ -65,6 +93,17 @@ class FieldOfficerFragment : Fragment(R.layout.fragment_field_officer) {
 
                     for (data in snapshot.children) {
                         val officer = data.getValue(FieldOfficer::class.java) ?: continue
+                        val accountStatus = AccountApprovalManager.effectiveStatus(
+                            data.child("accountStatus").value?.toString()
+                        )
+                        if (accountStatus != AccountApprovalManager.STATUS_APPROVED) continue
+                        val officerCityNormalized = ComplaintDataFormatter.normalizeCity(
+                            data.child("cityNormalized").value?.toString().orEmpty()
+                                .ifBlank { data.child("city").value?.toString().orEmpty() }
+                        )
+                        if (currentUserCityNormalized.isNotBlank() &&
+                            officerCityNormalized != currentUserCityNormalized
+                        ) continue
                         officer.uid = data.key.orEmpty()
                         officers.add(officer)
                     }

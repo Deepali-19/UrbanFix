@@ -37,6 +37,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.messaging.FirebaseMessaging
 import de.hdodenhof.circleimageview.CircleImageView
 import kotlinx.coroutines.launch
 import java.io.File
@@ -412,6 +413,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
     // Logs the user out.
     private fun logoutUser() {
+        FirebaseMessaging.getInstance().unsubscribeFromTopic("admin_notifications")
         auth.signOut()
         SessionManager.clear(requireContext())
         startActivity(Intent(requireContext(), LoginActivity::class.java))

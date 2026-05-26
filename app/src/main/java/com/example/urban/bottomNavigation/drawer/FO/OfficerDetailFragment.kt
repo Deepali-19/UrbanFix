@@ -13,8 +13,10 @@ import com.bumptech.glide.Glide
 import com.example.urban.R
 import com.example.urban.bottomNavigation.complaint.Complaint
 import com.example.urban.bottomNavigation.complaint.ComplaintAdapter
+import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
 import com.example.urban.bottomNavigation.complaint.ComplaintDetailFragment
 import com.example.urban.bottomNavigation.complaint.ComplaintSnapshotParser
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -34,9 +36,11 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
     private lateinit var recyclerView: RecyclerView
 
     private val database = FirebaseDatabase.getInstance().reference
+    private val auth = FirebaseAuth.getInstance()
 
     private var officerId: String? = null
     private var profileImageUrl = ""
+    private var currentViewerCityNormalized = ""
     private val complaintList = ArrayList<Complaint>()
     private lateinit var adapter: ComplaintAdapter
     private var isOfficerLoaded = false
@@ -76,8 +80,34 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
             }
         }
 
-        loadOfficerDetails()
-        loadComplaints()
+        loadViewerCity {
+            if (!canUseUi()) return@loadViewerCity
+            loadOfficerDetails()
+            loadComplaints()
+        }
+    }
+
+    // Loads the current viewer city so the officer detail stays inside the same city scope.
+    private fun loadViewerCity(onComplete: () -> Unit) {
+        val currentUid = auth.currentUser?.uid ?: run {
+            onComplete()
+            return
+        }
+
+        database.child("Users").child(currentUid)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                if (!canUseUi()) return@addOnSuccessListener
+                currentViewerCityNormalized = ComplaintDataFormatter.normalizeCity(
+                    snapshot.child("cityNormalized").value?.toString().orEmpty()
+                        .ifBlank { snapshot.child("city").value?.toString().orEmpty() }
+                )
+                onComplete()
+            }
+            .addOnFailureListener {
+                if (!canUseUi()) return@addOnFailureListener
+                onComplete()
+            }
     }
 
     // Loads officer profile details.
@@ -159,7 +189,9 @@ class OfficerDetailFragment : Fragment(R.layout.fragment_officer_detail) {
 
                     for (data in ComplaintSnapshotParser.complaintSnapshots(snapshot)) {
                         val complaint = ComplaintSnapshotParser.fromSnapshot(data) ?: continue
-                        if (complaint.allottedOfficerId == officerId) {
+                        if (complaint.allottedOfficerId == officerId &&
+                            ComplaintDataFormatter.matchesCity(complaint, currentViewerCityNormalized)
+                        ) {
                             complaintList.add(complaint)
                         }
                     }

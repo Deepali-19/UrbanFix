@@ -33,6 +33,8 @@ data class Complaint(
     val validation: Boolean = false,
     val readByAdmin: Boolean = false,
     val departmentId: String = "",
+    val city: String = "",
+    val cityNormalized: String = "",
 ) {
     @get:Exclude
     @set:Exclude

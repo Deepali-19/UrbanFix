@@ -47,6 +47,11 @@ val geminiApiKey = configValue("GEMINI_API_KEY")
 val geminiModel = configValue("GEMINI_MODEL", "gemini-2.5-flash")
 val sightengineApiUser = configValue("SIGHTENGINE_API_USER")
 val sightengineApiSecret = configValue("SIGHTENGINE_API_SECRET")
+val rootApprovalEmail = configValue("ROOT_APPROVAL_EMAIL")
+val fcmServerKey = configValue("FCM_SERVER_KEY")
+val smtpEmail = configValue("SMTP_EMAIL")
+val smtpAppPassword = configValue("SMTP_APP_PASSWORD")
+val approvalActionBaseUrl = configValue("APPROVAL_ACTION_BASE_URL")
 
 android {
     namespace = "com.example.urban"
@@ -72,6 +77,11 @@ android {
         buildConfigField("String", "GEMINI_MODEL", quoted(geminiModel))
         buildConfigField("String", "SIGHTENGINE_API_USER", quoted(sightengineApiUser))
         buildConfigField("String", "SIGHTENGINE_API_SECRET", quoted(sightengineApiSecret))
+        buildConfigField("String", "ROOT_APPROVAL_EMAIL", quoted(rootApprovalEmail))
+        buildConfigField("String", "FCM_SERVER_KEY", quoted(fcmServerKey))
+        buildConfigField("String", "SMTP_EMAIL", quoted(smtpEmail))
+        buildConfigField("String", "SMTP_APP_PASSWORD", quoted(smtpAppPassword))
+        buildConfigField("String", "APPROVAL_ACTION_BASE_URL", quoted(approvalActionBaseUrl))
     }
     packaging {
         resources {
@@ -79,8 +89,10 @@ android {
             excludes += "META-INF/DEPENDENCIES"
             excludes += "META-INF/LICENSE"
             excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/LICENSE.md"
             excludes += "META-INF/NOTICE"
             excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/NOTICE.md"
 
             pickFirsts += "META-INF/INDEX.LIST"
         }
@@ -156,6 +168,8 @@ dependencies {
 
     //okhttp :- HTTP networking library.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.sun.mail:android-mail:1.6.7")
+    implementation("com.sun.mail:android-activation:1.6.7")
     //Appwrite
     implementation("io.appwrite:sdk-for-android:12.0.0")
 

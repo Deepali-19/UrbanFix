@@ -15,8 +15,13 @@ import com.example.urban.loginSingUp.AppLockManager
 import com.example.urban.loginSingUp.SessionManager
 import com.example.urban.bottomNavigation.DashboardActivity
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
+import com.example.urban.loginSingUp.AccountApprovalManager
+import com.example.urban.loginSingUp.User
 
 class MainActivity : AppCompatActivity() {
+
+    private val database = FirebaseDatabase.getInstance().reference
 
     private val appLockLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -79,6 +84,47 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        database.child("Users").child(user.uid)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val userRecord = snapshot.getValue(User::class.java)
+                if (!snapshot.exists() || userRecord == null) {
+                    FirebaseAuth.getInstance().signOut()
+                    SessionManager.clear(this)
+                    startActivity(Intent(this, LoginActivity::class.java).apply {
+                        putExtra(SessionManager.EXTRA_SESSION_EXPIRED, false)
+                    })
+                    finish()
+                    return@addOnSuccessListener
+                }
+
+                val status = AccountApprovalManager.effectiveStatus(userRecord?.accountStatus)
+
+                when (status) {
+                    AccountApprovalManager.STATUS_APPROVED -> continueWithUnlockFlow()
+                    AccountApprovalManager.STATUS_PENDING,
+                    AccountApprovalManager.STATUS_REJECTED -> {
+                        FirebaseAuth.getInstance().signOut()
+                        SessionManager.clear(this)
+                        startActivity(Intent(this, LoginActivity::class.java).apply {
+                            putExtra(SessionManager.EXTRA_SESSION_EXPIRED, false)
+                        })
+                        finish()
+                    }
+                }
+            }
+            .addOnFailureListener {
+                FirebaseAuth.getInstance().signOut()
+                SessionManager.clear(this)
+                startActivity(Intent(this, LoginActivity::class.java).apply {
+                    putExtra(SessionManager.EXTRA_SESSION_EXPIRED, false)
+                })
+                finish()
+            }
+    }
+
+    // This continues the old unlock-or-dashboard flow after account status is confirmed.
+    private fun continueWithUnlockFlow() {
         if (SessionManager.isAppLockRequired(this)) {
             val unlockIntent = AppLockManager.createUnlockIntent(this)
             if (unlockIntent != null) {

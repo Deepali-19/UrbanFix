@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="30dp"
+        android:height="30dp"
+        android:drawable="@drawable/navi_drawer" />
+
+    <item
+        android:width="9dp"
+        android:height="9dp"
+        android:gravity="end|top"
+        android:left="20dp"
+        android:top="3dp"
+        android:drawable="@drawable/unread_dot" />
+</layer-list>

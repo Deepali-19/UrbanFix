@@ -124,6 +124,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
     private var currentUid = ""
     private var currentRole = ""
     private var currentDepartment = ""
+    private var currentCityNormalized = ""
     private var currentMode = MapMode.DENSITY
     private var currentDepartmentFilter = "All Departments"
     private var isRecentOnly = false
@@ -281,6 +282,10 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
                 if (!canUseUi()) return@addOnSuccessListener
                 currentRole = snapshot.child("role").value?.toString().orEmpty()
                 currentDepartment = normalizeDepartment(snapshot.child("department").value?.toString().orEmpty())
+                currentCityNormalized = ComplaintDataFormatter.normalizeCity(
+                    snapshot.child("cityNormalized").value?.toString().orEmpty()
+                        .ifBlank { snapshot.child("city").value?.toString().orEmpty() }
+                )
                 isUserLoaded = true
                 configureRoleUi()
                 listenToComplaints()
@@ -368,12 +373,13 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
     // This function checks whether a complaint belongs to the current user's map scope.
     private fun shouldIncludeForRole(complaint: Complaint): Boolean {
-        return when (currentRole) {
-            "Super Admin" -> true
-            "Department Admin" -> ComplaintDataFormatter.resolvedDepartment(complaint) == currentDepartment
-            "Field Officer" -> complaint.allottedOfficerId == currentUid
-            else -> false
-        }
+        return ComplaintDataFormatter.isVisibleToUser(
+            complaint = complaint,
+            role = currentRole,
+            userDepartment = currentDepartment,
+            userCityNormalized = currentCityNormalized,
+            userUid = currentUid
+        )
     }
 
     // This function decides what should be drawn on the map after filters and role rules are applied.

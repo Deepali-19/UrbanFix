@@ -13,6 +13,7 @@ import com.example.urban.bottomNavigation.DashboardActivity
 import com.example.urban.databinding.ActivityLoginBinding
 import com.example.urban.databinding.DialogForgotPasswordBinding
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 
 class LoginActivity : AppCompatActivity() {
 
@@ -25,6 +26,7 @@ class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var auth: FirebaseAuth
+    private val database = FirebaseDatabase.getInstance().reference
 
     // Sets up the login screen.
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -92,12 +94,62 @@ class LoginActivity : AppCompatActivity() {
 
         auth.signInWithEmailAndPassword(email, password)
             .addOnSuccessListener {
-                SessionManager.markAuthenticated(this)
-                startActivity(Intent(this, DashboardActivity::class.java))
-                finish()
+                verifyApprovedAccount()
             }
             .addOnFailureListener { e ->
                 toast(e.message ?: getString(R.string.login_failed))
+            }
+    }
+
+    // This allows only approved accounts into the app after Firebase Auth succeeds.
+    private fun verifyApprovedAccount() {
+        val uid = auth.currentUser?.uid ?: run {
+            toast(getString(R.string.login_failed))
+            return
+        }
+
+        database.child("Users").child(uid)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val user = snapshot.getValue(User::class.java)
+                if (!snapshot.exists() || user == null) {
+                    auth.signOut()
+                    SessionManager.clear(this)
+                    toast(getString(R.string.login_failed))
+                    return@addOnSuccessListener
+                }
+
+                val status = AccountApprovalManager.effectiveStatus(user?.accountStatus)
+
+                when (status) {
+                    AccountApprovalManager.STATUS_APPROVED -> {
+                        SessionManager.markAuthenticated(this)
+                        startActivity(Intent(this, DashboardActivity::class.java))
+                        finish()
+                    }
+
+                    AccountApprovalManager.STATUS_PENDING -> {
+                        auth.signOut()
+                        SessionManager.clear(this)
+                        toast(getString(R.string.account_pending))
+                    }
+
+                    else -> {
+                        auth.signOut()
+                        SessionManager.clear(this)
+                        toast(
+                            user.rejectionReason
+                                .takeIf { it.isNotBlank() }
+                                ?.let { AccountApprovalManager.rejectedMessage(it) }
+                                ?: getString(R.string.account_rejected)
+                        )
+                    }
+                }
+            }
+            .addOnFailureListener {
+                auth.signOut()
+                SessionManager.clear(this)
+                toast(getString(R.string.login_failed))
             }
     }
 

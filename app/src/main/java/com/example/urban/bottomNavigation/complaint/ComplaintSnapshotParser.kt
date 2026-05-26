@@ -1,6 +1,7 @@
 package com.example.urban.bottomNavigation.complaint
 
 import com.google.firebase.database.DataSnapshot
+import com.example.urban.loginSingUp.AccountApprovalManager
 import java.util.Locale
 
 object ComplaintSnapshotParser {
@@ -40,12 +41,33 @@ object ComplaintSnapshotParser {
             imageAiCheckedAt = readLong(snapshot, "imageAiCheckedAt") ?: 0L,
             validation = readBoolean(snapshot, "validation") ?: false,
             readByAdmin = readBoolean(snapshot, "readByAdmin") ?: false,
-            departmentId = readString(snapshot, "departmentId", "department", "dept", "departmentName", "selectedDepartment").orEmpty()
+            departmentId = readString(snapshot, "departmentId", "department", "dept", "departmentName", "selectedDepartment").orEmpty(),
+            city = readCity(snapshot).orEmpty(),
+            cityNormalized = readCityNormalized(snapshot).orEmpty()
         )
 
         complaint.firebaseKey = snapshot.key.orEmpty()
         complaint.firebasePath = snapshot.ref.path.toString()
         return complaint
+    }
+
+    // This reads the complaint city from direct fields first, then from nested location objects.
+    private fun readCity(snapshot: DataSnapshot): String? {
+        return readString(snapshot, "city", "cityName", "municipality", "district")
+            ?: readNestedString(snapshot, "location", "city")
+            ?: readNestedString(snapshot, "location", "district")
+            ?: readNestedString(snapshot, "address", "city")
+    }
+
+    // This keeps city matching stable even if old records only store a human-readable city string.
+    private fun readCityNormalized(snapshot: DataSnapshot): String? {
+        val explicitCityNormalized = readString(snapshot, "cityNormalized")
+        if (!explicitCityNormalized.isNullOrBlank()) {
+            return AccountApprovalManager.normalizeCity(explicitCityNormalized)
+        }
+
+        val city = readCity(snapshot)
+        return city?.takeIf { it.isNotBlank() }?.let(AccountApprovalManager::normalizeCity)
     }
 
     // This walks through flat or nested complaint trees and returns only real complaint nodes.

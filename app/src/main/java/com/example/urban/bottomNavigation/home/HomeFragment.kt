@@ -107,6 +107,7 @@ class HomeFragment : Fragment() {
     private var selectedRange = DashboardRange.ALL_TIME
     private var currentRole = ""
     private var currentDepartment = ""
+    private var currentCityNormalized = ""
     private var currentName = ""
     private var currentScopeLabel = "Dashboard"
     private var officerDirectory: Map<String, String> = emptyMap()
@@ -225,6 +226,10 @@ class HomeFragment : Fragment() {
 
                 currentRole = userSnapshot.child("role").value?.toString().orEmpty()
                 currentDepartment = userSnapshot.child("department").value?.toString().orEmpty()
+                currentCityNormalized = ComplaintDataFormatter.normalizeCity(
+                    userSnapshot.child("cityNormalized").value?.toString().orEmpty()
+                        .ifBlank { userSnapshot.child("city").value?.toString().orEmpty() }
+                )
                 currentName = userSnapshot.child("name").value?.toString().orEmpty()
                 currentScopeLabel = currentRole.ifBlank { "Dashboard" }
 
@@ -363,17 +368,13 @@ class HomeFragment : Fragment() {
 
     // This checks whether a complaint should count for the current user's dashboard.
     private fun shouldIncludeComplaint(complaint: Complaint, uid: String): Boolean {
-        return when (currentRole) {
-            "Super Admin" -> true
-            "Department Admin" -> {
-                ComplaintDataFormatter.resolvedDepartment(complaint) ==
-                    ComplaintDataFormatter.normalizeDepartment(currentDepartment)
-            }
-            "Field Officer" -> complaint.allottedOfficerId == uid
-            else -> {
-                true
-            }
-        }
+        return ComplaintDataFormatter.isVisibleToUser(
+            complaint = complaint,
+            role = currentRole,
+            userDepartment = currentDepartment,
+            userCityNormalized = currentCityNormalized,
+            userUid = uid
+        )
     }
 
     // This updates every dashboard card and chart from one shared analytics result.

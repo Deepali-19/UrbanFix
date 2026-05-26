@@ -44,6 +44,20 @@
             android:name=".loginSingUp.SingUpActivity"
             android:exported="true" />
         <activity
+            android:name=".loginSingUp.EmailApprovalActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="approval"
+                    android:scheme="urbanfix" />
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".loginSingUp.LoginActivity"
             android:exported="true"/>
 

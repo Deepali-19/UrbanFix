@@ -29,16 +29,21 @@ import com.example.urban.bottomNavigation.alert.AlertsFragment
 import com.example.urban.bottomNavigation.alert.AlertNotifier
 import com.example.urban.bottomNavigation.alert.AlertItem
 import com.example.urban.bottomNavigation.alert.AlertStorage
+import com.example.urban.bottomNavigation.approvals.ApprovalsFragment
 import com.example.urban.bottomNavigation.complaint.Complaint
 import com.example.urban.bottomNavigation.complaint.ComplaintDetailFragment
 import com.example.urban.bottomNavigation.complaint.ComplaintDataFormatter
 import com.example.urban.bottomNavigation.complaint.ComplaintFragment
 import com.example.urban.bottomNavigation.complaint.ComplaintSnapshotParser
+import com.example.urban.bottomNavigation.drawer.DA.DepartmentAdminDetailFragment
+import com.example.urban.bottomNavigation.drawer.DA.DepartmentAdminFragment
 import com.example.urban.bottomNavigation.drawer.FO.FieldOfficerFragment
 import com.example.urban.bottomNavigation.drawer.FO.OfficerDetailFragment
 import com.example.urban.bottomNavigation.home.HomeFragment
 import com.example.urban.bottomNavigation.map.MapFragment
 import com.example.urban.bottomNavigation.profile.ProfileFragment
+import com.example.urban.loginSingUp.AccountApprovalManager
+import com.example.urban.loginSingUp.ApprovalRequest
 import com.example.urban.loginSingUp.AppLockManager
 import com.example.urban.loginSingUp.LoginActivity
 import com.example.urban.loginSingUp.SessionManager
@@ -53,6 +58,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.google.firebase.messaging.FirebaseMessaging
 import java.util.UUID
 
@@ -64,6 +70,7 @@ class DashboardActivity : AppCompatActivity() {
         private const val PREF_BADGE_STATE = "bottom_nav_badges"
         private const val KEY_ALERT_DOT = "alert_dot"
         private const val KEY_COMPLAINT_DOT = "complaint_dot"
+        private const val ADMIN_NOTIFICATIONS_TOPIC = "admin_notifications"
     }
 
     private lateinit var bottomNav: BottomNavigationView
@@ -80,15 +87,19 @@ class DashboardActivity : AppCompatActivity() {
     private var adminMessageRef: DatabaseReference? = null
     private var complaintListener: ChildEventListener? = null
     private var complaintRef: DatabaseReference? = null
+    private var approvalsRef: DatabaseReference? = null
+    private var approvalsListener: ValueEventListener? = null
     private val knownAdminMessageKeys = mutableSetOf<String>()
     private val knownComplaintKeys = mutableSetOf<String>()
     private val knownComplaintAssignments = mutableMapOf<String, String>()
     private val liveAlertComplaintKeys = mutableSetOf<String>()
+    private var hasPendingApprovals = false
 
     private val auth = FirebaseAuth.getInstance()
     private val database = FirebaseDatabase.getInstance().reference
     private var currentUserRole = "Department Admin"
     private var currentUserDepartment = ""
+    private var currentUserCityNormalized = ""
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
     private val appLockLauncher =
@@ -133,7 +144,9 @@ class DashboardActivity : AppCompatActivity() {
         toolbar.setNavigationOnClickListener {
             when (currentFragment) {
                 is HomeFragment -> drawerLayout.openDrawer(GravityCompat.START)
+                is DepartmentAdminFragment,
                 is FieldOfficerFragment -> bottomNav.selectedItemId = R.id.nav_home
+                is DepartmentAdminDetailFragment,
                 is OfficerDetailFragment,
                 is ComplaintDetailFragment -> handleToolbarBack()
             }
@@ -145,8 +158,14 @@ class DashboardActivity : AppCompatActivity() {
 
         navDrawer.setNavigationItemSelectedListener {
             when (it.itemId) {
+                R.id.nav_department_admins -> {
+                    openDestination(R.id.nav_department_admins)
+                }
                 R.id.nav_officers -> {
                     openDestination(R.id.nav_officers)
+                }
+                R.id.nav_approvals -> {
+                    openDestination(R.id.nav_approvals)
                 }
             }
 
@@ -220,7 +239,9 @@ class DashboardActivity : AppCompatActivity() {
             R.id.nav_map -> loadFragment(MapFragment())
             R.id.nav_alerts -> loadFragment(AlertsFragment())
             R.id.nav_profile -> loadFragment(ProfileFragment())
+            R.id.nav_department_admins -> loadFragment(DepartmentAdminFragment())
             R.id.nav_officers -> loadFragment(FieldOfficerFragment())
+            R.id.nav_approvals -> loadFragment(ApprovalsFragment())
         }
     }
 
@@ -236,9 +257,19 @@ class DashboardActivity : AppCompatActivity() {
     private fun updateToolbarForFragment(fragment: Fragment) {
         when (fragment) {
             is HomeFragment -> {
-                toolbar.setNavigationIcon(R.drawable.navi_drawer)
+                updateDrawerNavigationIcon()
                 toolbar.title = getString(R.string.toolbar_dashboard)
                 drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+            }
+            is DepartmentAdminFragment -> {
+                toolbar.setNavigationIcon(R.drawable.ic_toolbar_back)
+                toolbar.title = getString(R.string.toolbar_department_admins)
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            }
+            is DepartmentAdminDetailFragment -> {
+                toolbar.setNavigationIcon(R.drawable.ic_toolbar_back)
+                toolbar.title = getString(R.string.toolbar_department_admins)
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
             }
             is FieldOfficerFragment -> {
                 toolbar.setNavigationIcon(R.drawable.ic_toolbar_back)
@@ -253,6 +284,11 @@ class DashboardActivity : AppCompatActivity() {
             is ComplaintDetailFragment -> {
                 toolbar.setNavigationIcon(R.drawable.ic_toolbar_back)
                 toolbar.title = getString(R.string.toolbar_complaint_detail)
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            }
+            is ApprovalsFragment -> {
+                toolbar.setNavigationIcon(R.drawable.ic_toolbar_back)
+                toolbar.title = getString(R.string.approval_title)
                 drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
             }
             is ProfileFragment -> {
@@ -292,8 +328,11 @@ class DashboardActivity : AppCompatActivity() {
         }
 
         when (currentFragment) {
+            is DepartmentAdminFragment,
+            is DepartmentAdminDetailFragment,
             is FieldOfficerFragment,
-            is OfficerDetailFragment -> bottomNav.selectedItemId = R.id.nav_home
+            is OfficerDetailFragment,
+            is ApprovalsFragment -> bottomNav.selectedItemId = R.id.nav_home
             is ComplaintDetailFragment -> bottomNav.selectedItemId = R.id.nav_complaints
         }
     }
@@ -395,12 +434,30 @@ class DashboardActivity : AppCompatActivity() {
             .get()
             .addOnSuccessListener {
                 if (isFinishing || isDestroyed) return@addOnSuccessListener
+                if (!it.exists()) {
+                    redirectToLogin(sessionExpired = false)
+                    return@addOnSuccessListener
+                }
 
                 val role = resolveRole(it.child("role").value?.toString())
                 val department = it.child("department").value?.toString().orEmpty()
+                val accountStatus = AccountApprovalManager.effectiveStatus(
+                    it.child("accountStatus").value?.toString()
+                )
+
+                if (accountStatus != AccountApprovalManager.STATUS_APPROVED) {
+                    redirectToLogin(sessionExpired = false)
+                    return@addOnSuccessListener
+                }
+
                 currentUserRole = role
                 currentUserDepartment = ComplaintDataFormatter.normalizeDepartment(department)
                     ?: department.trim()
+                currentUserCityNormalized = ComplaintDataFormatter.normalizeCity(
+                    it.child("cityNormalized").value?.toString().orEmpty()
+                        .ifBlank { it.child("city").value?.toString().orEmpty() }
+                )
+                syncAdminNotificationTopic(role)
                 setupBottomNav(role)
             }
             .addOnFailureListener {
@@ -413,6 +470,8 @@ class DashboardActivity : AppCompatActivity() {
 
         val menu = bottomNav.menu
         navDrawer.menu.findItem(R.id.nav_officers).isVisible = role != "Field Officer"
+        navDrawer.menu.findItem(R.id.nav_department_admins).isVisible = role == AccountApprovalManager.ROLE_SUPER_ADMIN
+        navDrawer.menu.findItem(R.id.nav_approvals).isVisible = role == AccountApprovalManager.ROLE_SUPER_ADMIN
 
         if (role == "Field Officer") {
             menu.findItem(R.id.nav_home).isVisible = false
@@ -426,9 +485,15 @@ class DashboardActivity : AppCompatActivity() {
         if (role == "Field Officer") {
             stopAdminMessageListener()
             startComplaintListener()
+            stopApprovalsListener()
+        } else if (role == AccountApprovalManager.ROLE_SUPER_ADMIN) {
+            startAdminMessageListener()
+            startComplaintListener()
+            startApprovalsListener()
         } else {
             startAdminMessageListener()
             startComplaintListener()
+            stopApprovalsListener()
         }
     }
 
@@ -471,6 +536,22 @@ class DashboardActivity : AppCompatActivity() {
                     .child("deviceToken")
                     .setValue(token)
             }
+    }
+
+    // Keeps the complaint-report FCM topic aligned with the current approved role.
+    private fun syncAdminNotificationTopic(role: String) {
+        val shouldReceiveComplaintReports = role == AccountApprovalManager.ROLE_SUPER_ADMIN ||
+            role == AccountApprovalManager.ROLE_DEPARTMENT_ADMIN
+
+        val topicTask = if (shouldReceiveComplaintReports) {
+            FirebaseMessaging.getInstance().subscribeToTopic(ADMIN_NOTIFICATIONS_TOPIC)
+        } else {
+            FirebaseMessaging.getInstance().unsubscribeFromTopic(ADMIN_NOTIFICATIONS_TOPIC)
+        }
+
+        topicTask.addOnFailureListener {
+            // We keep the app usable even if topic sync fails once.
+        }
     }
 
     // Requests notification permission on Android 13+.
@@ -612,6 +693,7 @@ class DashboardActivity : AppCompatActivity() {
                         "Field Officer" -> {
                             val currentUserId = auth.currentUser?.uid.orEmpty()
                             if (currentUserId.isBlank()) return@forEach
+                            if (!ComplaintDataFormatter.matchesCity(complaint, currentUserCityNormalized)) return@forEach
                             if (!complaint.allottedOfficerId.trim().equals(currentUserId, ignoreCase = false)) return@forEach
 
                             val alert = buildAssignmentAlert(complaintSnapshot, complaint)
@@ -639,6 +721,7 @@ class DashboardActivity : AppCompatActivity() {
 
                     val currentUserId = auth.currentUser?.uid.orEmpty()
                     if (currentUserId.isBlank()) return@forEach
+                    if (!ComplaintDataFormatter.matchesCity(complaint, currentUserCityNormalized)) return@forEach
 
                     val wasAssignedToCurrentUser = previousOfficerId == currentUserId
                     val isAssignedToCurrentUser = currentOfficerId == currentUserId
@@ -710,14 +793,13 @@ class DashboardActivity : AppCompatActivity() {
     }
 
     private fun shouldNotifyForComplaint(complaint: Complaint): Boolean {
-        return when (currentUserRole) {
-            "Super Admin" -> true
-            "Department Admin" -> {
-                val complaintDepartment = ComplaintDataFormatter.resolvedDepartment(complaint)
-                complaintDepartment.equals(currentUserDepartment, ignoreCase = true)
-            }
-            else -> false
-        }
+        return ComplaintDataFormatter.isVisibleToUser(
+            complaint = complaint,
+            role = currentUserRole,
+            userDepartment = currentUserDepartment,
+            userCityNormalized = currentUserCityNormalized,
+            userUid = auth.currentUser?.uid.orEmpty()
+        )
     }
 
     private fun shouldDispatchLiveAlert(eventKey: String): Boolean {
@@ -738,6 +820,80 @@ class DashboardActivity : AppCompatActivity() {
             "NEW REPORT: ${alert.title}\nID: ${alert.complaintDisplayId.ifBlank { "N/A" }}",
             Toast.LENGTH_LONG
         ).show()
+    }
+
+    // This listens for pending approval requests assigned to the current super admin.
+    private fun startApprovalsListener() {
+        if (approvalsRef != null) return
+
+        val uid = auth.currentUser?.uid ?: return
+        val ref = FirebaseDatabase.getInstance().getReference("ApprovalRequests")
+        approvalsRef = ref
+
+        approvalsListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val pendingCount = snapshot.children.mapNotNull { child ->
+                    child.getValue(ApprovalRequest::class.java)
+                }.count {
+                    it.status == AccountApprovalManager.STATUS_PENDING &&
+                        it.approvalRoute == AccountApprovalManager.ROUTE_CITY_SUPER_ADMIN &&
+                        it.targetApproverUid == uid
+                }
+
+                hasPendingApprovals = pendingCount > 0
+                updateDrawerApprovalBadge(hasPendingApprovals)
+                if (currentFragment is HomeFragment) {
+                    updateDrawerNavigationIcon()
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) = Unit
+        }
+
+        ref.addValueEventListener(approvalsListener as ValueEventListener)
+    }
+
+    // This stops the pending approval listener when the role does not need it.
+    private fun stopApprovalsListener() {
+        val ref = approvalsRef
+        val listener = approvalsListener
+        if (ref != null && listener != null) {
+            ref.removeEventListener(listener)
+        }
+
+        approvalsListener = null
+        approvalsRef = null
+        hasPendingApprovals = false
+        updateDrawerApprovalBadge(false)
+        if (currentFragment is HomeFragment) {
+            updateDrawerNavigationIcon()
+        }
+    }
+
+    // This switches the drawer icon between plain and dotted versions.
+    private fun updateDrawerNavigationIcon() {
+        toolbar.setNavigationIcon(
+            if (hasPendingApprovals) {
+                R.drawable.ic_drawer_with_dot
+            } else {
+                R.drawable.navi_drawer
+            }
+        )
+    }
+
+    // This shows a small red dot beside the drawer approval item.
+    private fun updateDrawerApprovalBadge(visible: Boolean) {
+        val menuItem = navDrawer.menu.findItem(R.id.nav_approvals) ?: return
+
+        if (visible) {
+            if (menuItem.actionView == null) {
+                menuItem.setActionView(R.layout.view_drawer_badge_dot)
+            } else {
+                menuItem.actionView?.visibility = View.VISIBLE
+            }
+        } else {
+            menuItem.actionView = null
+        }
     }
 
     // Stores and draws the small red dots on bottom navigation icons.
@@ -832,6 +988,8 @@ class DashboardActivity : AppCompatActivity() {
     private fun redirectToLogin(sessionExpired: Boolean) {
         stopAdminMessageListener()
         stopComplaintListener()
+        stopApprovalsListener()
+        FirebaseMessaging.getInstance().unsubscribeFromTopic(ADMIN_NOTIFICATIONS_TOPIC)
         auth.signOut()
         SessionManager.clear(this)
         startActivity(Intent(this, LoginActivity::class.java).apply {
@@ -952,6 +1110,7 @@ class DashboardActivity : AppCompatActivity() {
         super.onDestroy()
         stopAdminMessageListener()
         stopComplaintListener()
+        stopApprovalsListener()
     }
 
     // Opens biometric or phone lock when the user comes back to the app.

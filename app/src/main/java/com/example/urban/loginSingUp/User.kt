@@ -13,6 +13,14 @@ data class  User(
     val createdAt: Long = 0L,
     val employeeId: String = "",
     val idProofUrl: String = "",
-    val profileImageUrl: String = ""
+    val profileImageUrl: String = "",
+    val accountStatus: String = "approved",
+    val approvalRoute: String = "",
+    val cityNormalized: String = "",
+    val requestedAt: Long = 0L,
+    val approvedAt: Long = 0L,
+    val approvedBy: String = "",
+    val rejectedAt: Long = 0L,
+    val rejectedBy: String = "",
+    val rejectionReason: String = ""
 )
-

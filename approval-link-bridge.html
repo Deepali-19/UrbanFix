@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Urban Fix Approval</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f8fd;
+      color: #1f2937;
+    }
+    .wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .card {
+      width: 100%;
+      max-width: 640px;
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 8px 30px rgba(17, 24, 39, 0.08);
+      box-sizing: border-box;
+    }
+    .eyebrow {
+      color: #64748b;
+      font-size: 14px;
+      margin: 0 0 8px;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+    }
+    p {
+      margin: 0 0 18px;
+      color: #475569;
+      line-height: 1.6;
+    }
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 20px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      border: 1px solid #d7e3f4;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: #1665d8;
+      color: #ffffff;
+    }
+    .btn-secondary {
+      background: #eef4fb;
+      color: #1f2937;
+    }
+    .hint {
+      margin-top: 20px;
+      font-size: 13px;
+      color: #64748b;
+    }
+    .mono {
+      word-break: break-all;
+      font-family: monospace;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 12px;
+      color: #0f172a;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <p class="eyebrow">Urban Fix approval</p>
+      <h1>Open in Urban Fix</h1>
+      <p id="message">
+        We are opening the approval screen in Urban Fix now.
+      </p>
+
+      <div class="btn-row">
+        <a id="openAppButton" class="btn btn-primary" href="#">Open Urban Fix</a>
+        <a id="copyLinkButton" class="btn btn-secondary" href="#">Copy App Link</a>
+      </div>
+
+      <p class="hint">
+        If the app does not open automatically, use the button above. If Gmail keeps the link inside its own browser,
+        tap the three dots and choose <b>Open in browser</b>, then try again.
+      </p>
+
+      <div id="appLinkPreview" class="mono"></div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const requestId = params.get("requestId") || "";
+    const token = params.get("token") || "";
+    const action = params.get("action") || "";
+    const appUrl =
+      `urbanfix://approval?requestId=${encodeURIComponent(requestId)}&token=${encodeURIComponent(token)}&action=${encodeURIComponent(action)}`;
+
+    const message = document.getElementById("message");
+    const openAppButton = document.getElementById("openAppButton");
+    const copyLinkButton = document.getElementById("copyLinkButton");
+    const appLinkPreview = document.getElementById("appLinkPreview");
+
+    openAppButton.href = appUrl;
+    appLinkPreview.textContent = appUrl;
+
+    const actionLabel = action === "reject" ? "reject" : "approve";
+    message.textContent = `We are opening Urban Fix so you can ${actionLabel} this request inside the app.`;
+
+    copyLinkButton.addEventListener("click", async (event) => {
+      event.preventDefault();
+      try {
+        await navigator.clipboard.writeText(appUrl);
+        copyLinkButton.textContent = "Copied";
+      } catch (error) {
+        copyLinkButton.textContent = "Copy failed";
+      }
+    });
+
+    setTimeout(() => {
+      window.location.href = appUrl;
+    }, 400);
+  </script>
+</body>
+</html>

@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_department_admins"
+        android:title="@string/toolbar_department_admins" />
     <item android:id="@+id/nav_officers"
         android:title="@string/toolbar_field_officers"/>
+    <item
+        android:id="@+id/nav_approvals"
+        android:title="@string/approval_title" />
 
 </menu>
