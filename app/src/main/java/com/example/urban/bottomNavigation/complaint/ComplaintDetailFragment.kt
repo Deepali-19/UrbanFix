@@ -484,7 +484,8 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
 
                 if (fallbackPhone != null && fallbackPhone > 0L) {
                     currentComplaint = currentComplaint?.copy(phone = fallbackPhone)?.also {
-                        it.firebaseKey = complaintKey.orEmpty()
+                        it.firebaseKey = currentComplaint?.firebaseKey.orEmpty().ifBlank { complaintKey.orEmpty() }
+                        it.firebasePath = currentComplaint?.firebasePath.orEmpty()
                     }
                     tvPhoneValue.text = fallbackPhone.toString()
                 }
@@ -545,8 +546,13 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
             "resolvedAt" to if (status == 2) now else 0L
         )
 
-        database.child("Complaints")
-            .child(key)
+        val complaintRef = complaintNodeRef(complaint)
+        if (complaintRef == null) {
+            Toast.makeText(requireContext(), "Complaint path not found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        complaintRef
             .updateChildren(update)
             .addOnSuccessListener {
                 if (!canUseUi()) return@addOnSuccessListener
@@ -558,6 +564,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                     resolvedAt = if (status == 2) now else 0L
                 ).also {
                     it.firebaseKey = complaint.firebaseKey
+                    it.firebasePath = complaint.firebasePath
                 }
 
                 refreshEtaForComplaint(
@@ -960,13 +967,13 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
 
         val key = complaintKey ?: return
 
-        database.child("Complaints")
-            .child(key)
-            .child("readByAdmin")
-            .setValue(true)
+        complaintNodeRef(complaint)
+            ?.child("readByAdmin")
+            ?.setValue(true)
 
         currentComplaint = complaint.copy(readByAdmin = true).also {
             it.firebaseKey = complaint.firebaseKey
+            it.firebasePath = complaint.firebasePath
         }
     }
 
@@ -1003,6 +1010,7 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                     etaReason = etaPayload.etaReason
                 ).also {
                     it.firebaseKey = baseComplaint.firebaseKey
+                    it.firebasePath = baseComplaint.firebasePath
                 }
 
                 if (!ComplaintEtaManager.shouldPersist(baseComplaint, etaPayload)) {
@@ -1015,8 +1023,13 @@ class ComplaintDetailFragment : Fragment(R.layout.fragment_complaint_detail) {
                         return@addOnSuccessListener
                 }
 
-                database.child("Complaints")
-                    .child(complaintKey)
+                val complaintRef = complaintNodeRef(baseComplaint)
+                if (complaintRef == null) {
+                    onComplete(baseComplaint, false)
+                    return@addOnSuccessListener
+                }
+
+                complaintRef
                     .updateChildren(
                         mapOf(
                             "etaHours" to etaPayload.etaHours,
