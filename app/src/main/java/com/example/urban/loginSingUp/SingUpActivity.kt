@@ -321,29 +321,14 @@ class SingUpActivity : AppCompatActivity() {
         }
     }
 
-    // This checks whether the city already has a super admin before creating a pending staff request.
+    // This routes staff approval requests to the root management email.
     private fun startCityApprovalSignup(input: SignupInput) {
-        database.child("Users")
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val approver = findApprovedSuperAdmin(snapshot, input.city)
-                if (approver == null) {
-                    setSubmittingState(false)
-                    toast(getString(R.string.signup_no_super_admin_for_city))
-                    return@addOnSuccessListener
-                }
-
-                createPendingAccount(
-                    input = input,
-                    approvalRoute = AccountApprovalManager.ROUTE_CITY_SUPER_ADMIN,
-                    approverUid = approver.uid,
-                    approverEmail = approver.email
-                )
-            }
-            .addOnFailureListener {
-                setSubmittingState(false)
-                toast(it.message ?: getString(R.string.signup_failed))
-            }
+        createPendingAccount(
+            input = input,
+            approvalRoute = AccountApprovalManager.ROUTE_ROOT_EMAIL,
+            approverUid = "",
+            approverEmail = AppConfig.rootApprovalEmail
+        )
     }
 
     // This creates a pending super admin request only when the city does not already have one.
@@ -493,21 +478,31 @@ class SingUpActivity : AppCompatActivity() {
                 "idProofUrl" to uploadedImageUrl,
                 "actionToken" to request.actionToken,
                 "submittedAt" to submittedAt,
-                "approvalRoute" to approvalRoute
+                "approvalRoute" to approvalRoute,
+                "emailStatus" to "queued",
+                "lastQueuedAt" to submittedAt
             )
         }
 
         database.updateChildren(updates)
             .addOnSuccessListener {
                 lifecycleScope.launch {
-                    if (approverEmail.isNotBlank() && ApprovalEmailSender.isConfigured()) {
+                    val emailResult = if (approverEmail.isNotBlank() && ApprovalEmailSender.isConfigured()) {
                         ApprovalEmailSender.sendApprovalRequestEmail(request)
+                    } else {
+                        null
                     }
 
                     auth.signOut()
                     SessionManager.clear(this@SingUpActivity)
                     setSubmittingState(false)
-                    toast(getString(R.string.signup_request_submitted))
+
+                    if (emailResult?.isFailure == true) {
+                        toast(emailResult.exceptionOrNull()?.message ?: "Approval request saved, but email could not be sent")
+                    } else {
+                        toast(getString(R.string.signup_request_submitted))
+                    }
+
                     startActivity(Intent(this@SingUpActivity, LoginActivity::class.java))
                     finish()
                 }
